@@ -600,8 +600,8 @@ b.h2("Diseño y configuración de soluciones")
 b.h3("Arquitectura de la solución")
 b.para(
     "La arquitectura integra las fuentes de datos, una capa de dimensiones compartidas, los tres "
-    "modelos SAC y las salidas de consumo. Los datos reales provienen de SAP S/4HANA mediante conexión "
-    "nativa (CDS Views); el presupuesto se carga por plantillas Excel y los ajustes se ingresan "
+    "modelos SAC y las salidas de consumo. Los datos reales provienen de SAP S/4HANA a través de SAP "
+    "DataSphere (CDS Views); el presupuesto se carga por plantillas Excel y los ajustes se ingresan "
     "directamente en SAC.")
 b.figure(f"{IMG}/ciudad_arq.png",
          "Figura 5. Arquitectura de la solución SAP Analytics Cloud — Ciudad Limpia.")
@@ -726,7 +726,7 @@ b.h3("Integración y plantillas de carga")
 b.table(
     ["Fuente", "Mecanismo", "Frecuencia", "Objetos clave"],
     [
-        ["SAP S/4HANA (real)", "CDS Views / conexión nativa SAC–S4", "Diaria (fuera de horario)", "ACDOCA, SKA1, CEPC, CSKS, T001"],
+        ["SAP S/4HANA (real)", "SAP DataSphere (CDS Views)", "Diaria (fuera de horario)", "ACDOCA, SKA1, CEPC, CSKS, T001"],
         ["Excel / Plantillas (presupuesto)", "Carga de archivo en SAC Data Management", "Anual + forecast", "Plantillas estándar por categoría"],
         ["Input manual SAC (ajustes)", "Entrada directa en plantilla SAC", "Bajo demanda", "Solo Planeación Financiera"],
     ],

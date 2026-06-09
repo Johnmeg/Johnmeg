@@ -54,11 +54,13 @@ def header_box(ax, cx, cy, w, h, title, body, fc=WHITE, ec=NAVY,
     ax.add_patch(FancyBboxPatch((x, y), w, h,
                  boxstyle="round,pad=0.004,rounding_size=0.02",
                  linewidth=1.4, edgecolor=ec, facecolor=fc, zorder=3))
-    hh = min(0.16, h * 0.34)
+    nlines = str(title).count('\n') + 1
+    hh = nlines * 2.6 + 1.2
     ax.add_patch(plt.Rectangle((x, y + h - hh), w, hh, facecolor=hc,
                  edgecolor=ec, linewidth=1.4, zorder=4))
     ax.text(cx, y + h - hh / 2, title, ha="center", va="center",
-            fontsize=fs + 0.6, color=htc, fontweight="bold", zorder=5)
+            fontsize=fs + 0.6, color=htc, fontweight="bold", zorder=5,
+            linespacing=1.1)
     ax.text(cx, y + (h - hh) / 2, _wrap(body, wrap), ha="center", va="center",
             fontsize=fs, color="#1A1A1A", zorder=5, linespacing=1.3)
 
@@ -185,33 +187,33 @@ def architecture(path, client, sources, integration, dims, models_note,
 def dataflow(path, client, ingresos_items, costos_items, eeff_items,
              ingresos_engine, costos_engine, subtitle):
     fig, ax, top = new_canvas(
-        h=6.6,
+        h=7.4,
         title=f"Flujo de cálculo y consolidación de modelos — {client}",
         subtitle=subtitle)
-    midy = (top - 7) / 2 + 1.0
+    iy = top - 17.0
+    cyy = 12.5
+    midy = (iy + cyy) / 2
 
-    # Columna 1: entradas Ingresos / Costos
-    iy = midy + 13
-    cyy = midy - 13
-    header_box(ax, 14, iy, 22, 15, "Modelo de Ingresos",
-               ingresos_items, hc=BLUE, ec=BLUE, fs=8.2, wrap=34)
-    header_box(ax, 14, cyy, 22, 15, "Modelo de Costos y Gastos",
-               costos_items, hc=RED, ec=RED, fs=8.2, wrap=34)
+    # Columna 1: modelos de origen
+    header_box(ax, 15, iy, 24, 17, "Modelo de Ingresos",
+               ingresos_items, hc=BLUE, ec=BLUE, fs=7.7, wrap=40)
+    header_box(ax, 15, cyy, 24, 17, "Modelo de Costos y Gastos",
+               costos_items, hc=RED, ec=RED, fs=7.7, wrap=40)
 
     # Columna 2: motores de cálculo
-    box(ax, 42, iy, 19, 11, ingresos_engine, fc=LBLUE, ec=BLUE, bold=True,
-        fs=8.2, wrap=26)
-    box(ax, 42, cyy, 19, 11, costos_engine, fc=LRED, ec=RED, bold=True,
-        fs=8.2, wrap=26)
-    arrow(ax, (25, iy), (32.5, iy), color=BLUE, lw=2.0)
-    arrow(ax, (25, cyy), (32.5, cyy), color=RED, lw=2.0)
+    box(ax, 44, iy, 20, 11, ingresos_engine, fc=LBLUE, ec=BLUE, bold=True,
+        fs=8.0, wrap=28)
+    box(ax, 44, cyy, 20, 11, costos_engine, fc=LRED, ec=RED, bold=True,
+        fs=8.0, wrap=28)
+    arrow(ax, (27.2, iy), (34.2, iy), color=BLUE, lw=2.0)
+    arrow(ax, (27.2, cyy), (34.2, cyy), color=RED, lw=2.0)
 
-    # Columna 3: EEFF
-    header_box(ax, 73, midy, 24, 30, "Modelo EEFF (consolidado)",
-               eeff_items, hc=GREEN, ec=GREEN, fs=8.2, wrap=36)
-    arrow(ax, (51.5, iy), (61, midy + 8), color=BLUE, lw=2.2, rad=-0.12)
-    arrow(ax, (51.5, cyy), (61, midy - 8), color=RED, lw=2.2, rad=0.12)
-    ax.text(56.5, midy + 12.5, "Data Action /\nenvío a EEFF", ha="center",
+    # Columna 3: EEFF consolidado
+    header_box(ax, 77, midy, 24, 31, "Modelo EEFF (consolidado)",
+               eeff_items, hc=GREEN, ec=GREEN, fs=7.7, wrap=40)
+    arrow(ax, (54.2, iy), (65, midy + 9), color=BLUE, lw=2.2, rad=-0.12)
+    arrow(ax, (54.2, cyy), (65, midy - 9), color=RED, lw=2.2, rad=0.12)
+    ax.text(59, midy + 13, "Data Action /\nenvío a EEFF", ha="center",
             va="center", fontsize=7.2, color=GREY, style="italic")
 
     ax.text(2, 1.4, "Cada modelo de origen escribe en el EEFF mediante Data "
