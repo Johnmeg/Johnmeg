@@ -119,8 +119,8 @@ def architecture(path, client, sources, integration, dims, models_note,
 
     # --- Stage 1: Fuentes ---
     n = len(sources)
-    sh = 7.0
     gap = 2.0
+    sh = max(6.5, min(14.0, 34.0 / n - gap))
     total = n * sh + (n - 1) * gap
     y0 = midy + total / 2 - sh / 2
     src_centers = []

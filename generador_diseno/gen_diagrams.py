@@ -44,10 +44,8 @@ def program_overview():
 def fanalca():
     F.architecture(
         f"{OUT}/fanalca_arq.png", "Fanalca S.A.",
-        sources=["SAP S/4HANA\n(FI · CO · SD · MM)", "SAP BPC\n(17+ scripts a migrar)",
-                 "UNOE\n(presupuesto de gastos)", "SAP BW/4HANA\n(carga del real)",
-                 "Excel / Plantillas"],
-        integration="SAP DataSphere\n+ SAP BW/4HANA\n\nVirtualización y\nmaestros",
+        sources=["SAP S/4HANA\n(FI · CO · SD · MM)", "Excel / Plantillas"],
+        integration="SAP DataSphere\n\nVirtualización y\nmaestros",
         dims="SOCIEDAD · CEBES\nCECOS · CUENTA\nMONEDA · AUDITORIA\nVersion · Date\nREFERENCIA · CLIENTES\nRATIO",
         ingresos_label="Modelo de Ingresos\n9 dim · P×Q · cartera · inventario",
         costos_label="Modelo de Costos y Gastos\n8 dim · nómina · CIF · OPEX",
