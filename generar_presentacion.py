@@ -2,6 +2,7 @@
 """
 Generador de presentación profesional:
 SAP Analytics Cloud enfocado en Planning.
+Versión orientada a COMITÉ DE DIRECCIÓN (público no técnico).
 """
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
@@ -19,6 +20,8 @@ NAVY      = RGBColor(0x0A, 0x2A, 0x43)   # Azul profundo (fondo oscuro)
 BLUE      = RGBColor(0x00, 0x6E, 0xC7)   # Azul SAP
 TEAL      = RGBColor(0x0F, 0xA9, 0xB0)   # Verde-azulado acento
 GOLD      = RGBColor(0xF5, 0xB2, 0x41)   # Ámbar acento
+GREEN     = RGBColor(0x2E, 0x9E, 0x6B)   # Verde positivo
+TERRA     = RGBColor(0xC2, 0x6B, 0x5A)   # Terracota (dolor / "antes")
 LIGHT     = RGBColor(0xF4, 0xF7, 0xFA)   # Fondo claro
 GREY      = RGBColor(0x5B, 0x6B, 0x7B)   # Texto secundario
 DARKTXT   = RGBColor(0x13, 0x2A, 0x3E)   # Texto principal
@@ -134,39 +137,35 @@ def pnum():
 # SLIDE 1 — PORTADA
 # ============================================================================
 s = slide(); bg(s, NAVY)
-# banda diagonal decorativa
 band = rect(s, Inches(-1), Inches(4.7), Inches(16), Inches(4), BLUE, shape=MSO_SHAPE.PARALLELOGRAM)
-band.rotation = 0
 band.fill.fore_color.rgb = RGBColor(0x0C,0x3A,0x5C)
-# círculos acento
 rect(s, Inches(10.4), Inches(-1.3), Inches(3.6), Inches(3.6), RGBColor(0x0F,0x3E,0x60), shape=MSO_SHAPE.OVAL)
 rect(s, Inches(11.6), Inches(4.9), Inches(2.4), Inches(2.4), RGBColor(0x11,0x4A,0x70), shape=MSO_SHAPE.OVAL)
 rect(s, Inches(0.9), Inches(1.05), Inches(0.16), Inches(0.9), GOLD)
 
-txt(s, Inches(1.25), Inches(1.0), Inches(9), Inches(0.5),
-    [one("SOLUCIÓN DE PLANIFICACIÓN EMPRESARIAL", 13, TEAL, FONT_H, True)], space_after=0)
+txt(s, Inches(1.25), Inches(1.0), Inches(10), Inches(0.5),
+    [one("PLANIFICACIÓN PARA LA TOMA DE DECISIONES", 13, TEAL, FONT_H, True)], space_after=0)
 txt(s, Inches(1.2), Inches(1.7), Inches(10.7), Inches(2.2),
     [ one("SAP Analytics Cloud", 54, WHITE, FONT_H, True),
-      one("Enfoque en Planning", 40, GOLD, FONT_L, False) ],
+      one("El futuro del negocio, planificado", 38, GOLD, FONT_L, False) ],
     space_after=6, line_spacing=1.02)
-txt(s, Inches(1.24), Inches(4.05), Inches(9.6), Inches(1.0),
-    [one("Planificación conectada, colaborativa e inteligente para Finanzas, "
-         "Ventas y Recursos Humanos en una única plataforma en la nube.",
+txt(s, Inches(1.24), Inches(4.05), Inches(9.8), Inches(1.0),
+    [one("Una plataforma para planificar, anticipar y decidir con datos fiables. "
+         "Menos hojas de cálculo, más visión de negocio.",
          16, RGBColor(0xC7,0xD6,0xE3), FONT_T, False)],
     line_spacing=1.25, space_after=0)
 
-# chips inferiores
-chips = ["Planificación", "Análisis", "Predicción"]
+chips = ["Visión", "Control", "Agilidad"]
 cx = Inches(1.24)
 for c in chips:
     w = Inches(2.0)
-    ch = no_fill_rect(s, cx, Inches(5.7), w, Inches(0.52), TEAL, line_w=Pt(1.25))
+    no_fill_rect(s, cx, Inches(5.7), w, Inches(0.52), TEAL, line_w=Pt(1.25))
     txt(s, cx, Inches(5.7), w, Inches(0.52), [one(c, 13, WHITE, FONT_H, True)],
         align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
     cx += Inches(2.2)
 
 txt(s, Inches(1.24), Inches(6.65), Inches(9), Inches(0.4),
-    [one("Presentación profesional  ·  2026", 11, RGBColor(0x8A,0x9C,0xAD), FONT_T, False)],
+    [one("Sesión para el equipo directivo  ·  2026", 11, RGBColor(0x8A,0x9C,0xAD), FONT_T, False)],
     space_after=0)
 
 
@@ -176,24 +175,23 @@ txt(s, Inches(1.24), Inches(6.65), Inches(9), Inches(0.4),
 s = slide(); bg(s, LIGHT)
 rect(s, 0, 0, Inches(4.5), SH, NAVY)
 rect(s, Inches(4.5), 0, Inches(0.06), SH, GOLD)
-txt(s, Inches(0.6), Inches(0.9), Inches(0.16), Inches(0.9), [], )
 rect(s, Inches(0.6), Inches(0.95), Inches(0.14), Inches(0.7), GOLD)
 txt(s, Inches(0.85), Inches(0.85), Inches(3.4), Inches(0.5),
     [one("CONTENIDO", 13, TEAL, FONT_H, True)], space_after=0)
 txt(s, Inches(0.83), Inches(1.25), Inches(3.5), Inches(1.4),
-    [one("Agenda de la sesión", 30, WHITE, FONT_H, True)], line_spacing=1.02, space_after=0)
-txt(s, Inches(0.85), Inches(5.9), Inches(3.4), Inches(1),
-    [one("Un recorrido desde la visión general de la plataforma hasta las "
-         "capacidades específicas de Planning.", 12, RGBColor(0xB9,0xCB,0xDA), FONT_T, False)],
+    [one("Recorrido de hoy", 30, WHITE, FONT_H, True)], line_spacing=1.02, space_after=0)
+txt(s, Inches(0.85), Inches(5.85), Inches(3.4), Inches(1.2),
+    [one("Del problema que vivimos hoy al valor que aporta al negocio. "
+         "Sin tecnicismos.", 12, RGBColor(0xB9,0xCB,0xDA), FONT_T, False)],
     line_spacing=1.25, space_after=0)
 
 agenda = [
-    ("01", "¿Qué es SAP Analytics Cloud?", "Plataforma y propuesta de valor"),
-    ("02", "Los tres pilares de la plataforma", "BI, Planning y Predictive"),
-    ("03", "¿Qué es SAC Planning?", "Concepto y alcance"),
-    ("04", "Capacidades clave de Planning", "Funcionalidades diferenciadoras"),
-    ("05", "El ciclo de planificación", "Del dato a la decisión"),
-    ("06", "Casos de uso y beneficios", "FP&A, ventas y RR. HH."),
+    ("01", "El reto que tenemos hoy", "Por qué planificar nos cuesta tanto"),
+    ("02", "¿Qué es SAP Analytics Cloud?", "Una única plataforma, explicada simple"),
+    ("03", "Qué aporta a la dirección", "Planificar mirando al futuro"),
+    ("04", "Qué podremos hacer", "En lenguaje de negocio"),
+    ("05", "Antes y después", "El cambio, de un vistazo"),
+    ("06", "Impacto y beneficios", "Valor para cada área"),
 ]
 ay = Inches(0.95)
 for num, t, sub in agenda:
@@ -211,34 +209,68 @@ footer(s, pnum())
 
 
 # ============================================================================
-# SLIDE 3 — ¿QUÉ ES SAC?
+# SLIDE 3 — EL RETO ACTUAL
 # ============================================================================
 s = slide(); bg(s, LIGHT)
-page_header(s, "Visión general", "¿Qué es SAP Analytics Cloud?")
+page_header(s, "El punto de partida", "El reto que tenemos hoy")
+txt(s, Inches(0.85), Inches(1.6), Inches(11.6), Inches(0.5),
+    [one("Planificar el negocio sigue siendo lento, disperso y poco fiable. Estos son los síntomas habituales:",
+         14, GREY, FONT_T, False)], space_after=0)
 
-txt(s, Inches(0.85), Inches(1.85), Inches(6.2), Inches(2.4),
-    [ one("SAP Analytics Cloud (SAC) es la solución SaaS de análisis de SAP "
-          "que reúne, en un único entorno en la nube, las capacidades de "
-          "inteligencia de negocio, planificación empresarial y análisis "
-          "predictivo.", 15.5, DARKTXT, FONT_T, False),
+pains = [
+    ("✕", "Demasiado Excel", "Decenas de hojas sueltas, versiones que no cuadran y errores manuales."),
+    ("↺", "Miramos al retrovisor", "Analizamos el pasado, pero cuesta anticipar lo que viene."),
+    ("⧉", "Cada área, su versión", "Finanzas, ventas y RR. HH. trabajan con números distintos."),
+    ("⏱", "Ciclos lentos", "Cerrar un presupuesto lleva semanas de idas y venidas."),
+]
+gx0 = Inches(0.85); cw = Inches(2.87); gap = Inches(0.24)
+for i,(ic, h, d) in enumerate(pains):
+    x = gx0 + i*(cw+gap)
+    card = rect(s, x, Inches(2.35), cw, Inches(3.15), CARD, shape=MSO_SHAPE.ROUNDED_RECTANGLE)
+    soft_shadow(card)
+    rect(s, x, Inches(2.35), cw, Inches(0.12), TERRA, shape=MSO_SHAPE.ROUND_2_SAME_RECTANGLE)
+    icon_circle(s, x+Inches(0.35), Inches(2.7), Inches(0.7), TERRA, ic, 22)
+    txt(s, x+Inches(0.35), Inches(3.6), cw-Inches(0.7), Inches(0.5),
+        [one(h, 16, DARKTXT, FONT_H, True)], space_after=0)
+    txt(s, x+Inches(0.35), Inches(4.15), cw-Inches(0.7), Inches(1.2),
+        [one(d, 12, GREY, FONT_T, False)], line_spacing=1.2, space_after=0)
+
+band = rect(s, Inches(0.85), Inches(5.85), Inches(11.63), Inches(0.75), NAVY, shape=MSO_SHAPE.ROUNDED_RECTANGLE)
+txt(s, Inches(1.1), Inches(5.96), Inches(11.2), Inches(0.55),
+    [[("La consecuencia:  ", 14, GOLD, FONT_H, True),
+      ("decidimos tarde y con información en la que no siempre confiamos.",
+       14, RGBColor(0xDD,0xE7,0xF0), FONT_T, False)]],
+    anchor=MSO_ANCHOR.MIDDLE, space_after=0)
+footer(s, pnum())
+
+
+# ============================================================================
+# SLIDE 4 — ¿QUÉ ES SAP ANALYTICS CLOUD?
+# ============================================================================
+s = slide(); bg(s, LIGHT)
+page_header(s, "La solución", "¿Qué es SAP Analytics Cloud?")
+
+txt(s, Inches(0.85), Inches(1.85), Inches(6.2), Inches(2.6),
+    [ one("Es una plataforma en la nube de SAP que reúne, en un mismo sitio, "
+          "todo lo que la dirección necesita para entender y planificar el negocio.",
+          15.5, DARKTXT, FONT_T, False),
       [("", 6, DARKTXT, FONT_T, False)],
-      one("Su propuesta central es eliminar los silos entre el reporting del "
-          "pasado y la planificación del futuro: los mismos datos, modelos y "
-          "usuarios trabajan sobre una sola plataforma de “confianza única”.",
+      one("Piénselo como un “cuadro de mando único”: en lugar de pedir informes "
+          "a distintas áreas y juntarlos en Excel, todos trabajan sobre los "
+          "mismos números, siempre actualizados.",
           14, GREY, FONT_T, False) ],
     line_spacing=1.28, space_after=8)
 
-# tarjeta lateral con datos clave
 card = rect(s, Inches(7.55), Inches(1.85), Inches(5.0), Inches(4.55), NAVY, shape=MSO_SHAPE.ROUNDED_RECTANGLE)
 soft_shadow(card)
 rect(s, Inches(7.55), Inches(1.85), Inches(5.0), Inches(0.12), GOLD, shape=MSO_SHAPE.ROUND_2_SAME_RECTANGLE)
 txt(s, Inches(7.95), Inches(2.15), Inches(4.3), Inches(0.5),
     [one("EN POCAS PALABRAS", 12, TEAL, FONT_H, True)], space_after=0)
 facts = [
-    ("100% nube", "Solución SaaS, sin infraestructura que mantener."),
-    ("Todo en uno", "Analítica, planificación y predicción integradas."),
-    ("Colaborativa", "Múltiples usuarios y áreas sobre un único modelo."),
-    ("Conectada", "Datos en vivo o importados de SAP y de terceros."),
+    ("Todo en un solo lugar", "Informes, presupuestos y previsiones juntos."),
+    ("Siempre en la nube", "Accesible y actualizado, sin instalar nada."),
+    ("Para toda la empresa", "Las áreas comparten los mismos datos."),
+    ("Fácil de usar", "Pensada para el negocio, no solo para técnicos."),
 ]
 fy = Inches(2.65)
 for h, d in facts:
@@ -249,87 +281,39 @@ for h, d in facts:
         [one(d, 11.5, RGBColor(0xB9,0xCB,0xDA), FONT_T, False)], line_spacing=1.15, space_after=0)
     fy += Inches(0.95)
 
-# banda inferior "una sola verdad"
 b = rect(s, Inches(0.85), Inches(5.35), Inches(6.2), Inches(1.05), WHITE, shape=MSO_SHAPE.ROUNDED_RECTANGLE)
 soft_shadow(b)
 rect(s, Inches(0.85), Inches(5.35), Inches(0.12), Inches(1.05), BLUE)
 txt(s, Inches(1.15), Inches(5.5), Inches(5.7), Inches(0.8),
-    [ one("Una única fuente de la verdad", 14.5, BLUE, FONT_H, True),
-      one("Reporting, planes y previsiones comparten datos y definiciones.",
+    [ one("Una única versión de la verdad", 14.5, BLUE, FONT_H, True),
+      one("Se acabó el “¿con qué número nos quedamos?”.",
           12, GREY, FONT_T, False) ], line_spacing=1.15, space_after=3)
 footer(s, pnum())
 
 
 # ============================================================================
-# SLIDE 4 — LOS TRES PILARES
-# ============================================================================
-s = slide(); bg(s, LIGHT)
-page_header(s, "Arquitectura funcional", "Los tres pilares de la plataforma")
-txt(s, Inches(0.85), Inches(1.6), Inches(11.6), Inches(0.5),
-    [one("SAC integra tres disciplinas analíticas que tradicionalmente vivían en herramientas separadas.",
-         14, GREY, FONT_T, False)], space_after=0)
-
-pillars = [
-    ("BI", "Business Intelligence", BLUE,
-     ["Cuadros de mando y reporting", "Exploración visual de datos", "Historias interactivas"]),
-    ("PL", "Planning", TEAL,
-     ["Presupuestos y forecasts", "Escenarios y simulaciones", "Planificación colaborativa"]),
-    ("AI", "Predictive & IA", GOLD,
-     ["Smart Predict y forecast", "Insights automáticos", "Asistente 'Just Ask'"]),
-]
-px = Inches(0.85)
-cw = Inches(3.83)
-for i,(tag, name, col, items) in enumerate(pillars):
-    highlight = (name == "Planning")
-    top = Inches(2.35) if not highlight else Inches(2.15)
-    hgt = Inches(4.05) if not highlight else Inches(4.35)
-    base = NAVY if highlight else CARD
-    card = rect(s, px, top, cw, hgt, base, shape=MSO_SHAPE.ROUNDED_RECTANGLE)
-    soft_shadow(card)
-    rect(s, px, top, cw, Inches(0.14), col, shape=MSO_SHAPE.ROUND_2_SAME_RECTANGLE)
-    icon_circle(s, px+Inches(0.35), top+Inches(0.42), Inches(0.85), col, tag, 20)
-    tcol = WHITE if highlight else DARKTXT
-    scol = RGBColor(0xB9,0xCB,0xDA) if highlight else GREY
-    txt(s, px+Inches(0.35), top+Inches(1.5), cw-Inches(0.7), Inches(0.55),
-        [one(name, 20, tcol, FONT_H, True)], space_after=0)
-    if highlight:
-        txt(s, px+Inches(0.35), top+Inches(2.02), cw-Inches(0.7), Inches(0.35),
-            [one("● NUESTRO FOCO", 11, GOLD, FONT_H, True)], space_after=0)
-    iy = top + (Inches(2.5) if highlight else Inches(2.15))
-    for it in items:
-        rect(s, px+Inches(0.4), iy+Inches(0.08), Inches(0.13), Inches(0.13), col, shape=MSO_SHAPE.OVAL)
-        txt(s, px+Inches(0.68), iy, cw-Inches(1.0), Inches(0.5),
-            [one(it, 12.5, tcol if not highlight else RGBColor(0xDD,0xE7,0xF0), FONT_T, False)],
-            line_spacing=1.1, space_after=0)
-        iy += Inches(0.52)
-    px += Inches(4.08)
-footer(s, pnum())
-
-
-# ============================================================================
-# SLIDE 5 — ¿QUÉ ES SAC PLANNING?
+# SLIDE 5 — QUÉ APORTA A LA DIRECCIÓN (Planning)
 # ============================================================================
 s = slide(); bg(s, NAVY)
-# panel derecho decorativo
 rect(s, Inches(8.9), 0, Inches(4.43), SH, RGBColor(0x0C,0x3A,0x5C))
 rect(s, Inches(8.9), 0, Inches(0.06), SH, GOLD)
-page_header(s, "El foco de hoy", "¿Qué es SAP Analytics Cloud Planning?", dark=True)
+page_header(s, "El foco de hoy", "Planificar mirando al futuro", dark=True)
 
 txt(s, Inches(0.85), Inches(1.9), Inches(7.6), Inches(2.0),
-    [ one("Es el módulo de planificación empresarial de SAC. Permite crear, "
-          "gestionar y colaborar en presupuestos, previsiones y planes "
-          "operativos, trabajando directamente sobre los datos analíticos, "
-          "sin exportar a hojas de cálculo.", 15.5, RGBColor(0xDD,0xE7,0xF0), FONT_T, False) ],
+    [ one("Dentro de la plataforma, Planning es la parte que ayuda a la "
+          "dirección a preparar el futuro: presupuestos, previsiones y planes "
+          "de las distintas áreas, en un mismo lugar y siempre conectados con "
+          "la realidad del negocio.", 15.5, RGBColor(0xDD,0xE7,0xF0), FONT_T, False) ],
     line_spacing=1.3, space_after=0)
 
 txt(s, Inches(0.85), Inches(3.7), Inches(7.6), Inches(0.4),
-    [one("LO QUE HACE DIFERENTE A SAC PLANNING", 12.5, TEAL, FONT_H, True)], space_after=0)
+    [one("QUÉ SIGNIFICA PARA LA DIRECCIÓN", 12.5, TEAL, FONT_H, True)], space_after=0)
 
 diff = [
-    ("Datos y plan, unidos", "El plan se construye sobre el modelo analítico real."),
-    ("Fin de las hojas sueltas", "Reemplaza los Excel dispersos por un modelo gobernado."),
-    ("Colaboración en vivo", "Tareas, comentarios y flujos de aprobación integrados."),
-    ("Del análisis a la acción", "Se analiza el pasado y se planifica el futuro en el mismo sitio."),
+    ("Anticiparse, no reaccionar", "Ver a dónde va el negocio antes de que ocurra."),
+    ("Adiós a los Excel dispersos", "Un plan compartido, ordenado y fiable."),
+    ("Todos remando a la vez", "Áreas alineadas sobre los mismos objetivos."),
+    ("Del dato a la decisión", "La información lleva directamente a la acción."),
 ]
 dy = Inches(4.15)
 for h, d in diff:
@@ -340,13 +324,12 @@ for h, d in diff:
         [one(d, 12, RGBColor(0xB9,0xCB,0xDA), FONT_T, False)], space_after=0)
     dy += Inches(0.72)
 
-# panel derecho: cifras/proceso
 txt(s, Inches(9.25), Inches(1.95), Inches(3.8), Inches(0.4),
-    [one("EN LA PRÁCTICA", 12, GOLD, FONT_H, True)], space_after=0)
-steps = [("Recopila", "datos reales y supuestos"),
-         ("Modela", "escenarios y drivers"),
-         ("Colabora", "entre áreas y responsables"),
-         ("Decide", "con previsiones fiables")]
+    [one("LA IDEA, EN 4 PASOS", 12, GOLD, FONT_H, True)], space_after=0)
+steps = [("Reunir", "los datos del negocio"),
+         ("Planear", "objetivos y previsiones"),
+         ("Colaborar", "entre todas las áreas"),
+         ("Decidir", "con confianza")]
 sy = Inches(2.5)
 for i,(h,d) in enumerate(steps):
     icon_circle(s, Inches(9.25), sy, Inches(0.5), GOLD, str(i+1), 16, NAVY)
@@ -361,27 +344,27 @@ footer(s, pnum(), dark=True)
 
 
 # ============================================================================
-# SLIDE 6 — CAPACIDADES CLAVE
+# SLIDE 6 — QUÉ PODREMOS HACER (en lenguaje de negocio)
 # ============================================================================
 s = slide(); bg(s, LIGHT)
-page_header(s, "Funcionalidad", "Capacidades clave de Planning")
+page_header(s, "En la práctica", "Qué podremos hacer")
 txt(s, Inches(0.85), Inches(1.6), Inches(11.6), Inches(0.5),
-    [one("Un conjunto de herramientas diseñadas para automatizar y enriquecer el proceso de planificación.",
+    [one("Capacidades explicadas en lenguaje de negocio, sin entrar en la tecnología que hay detrás.",
          14, GREY, FONT_T, False)], space_after=0)
 
 caps = [
-    ("▦", "Modelos multidimensionales",
-     "Cuentas, tiempo, versiones y dimensiones de negocio en un único modelo.", BLUE),
-    ("↻", "Data Actions",
-     "Automatizan cálculos, copias de versiones y distribuciones complejas.", TEAL),
-    ("⌥", "Value Driver Trees",
-     "Simulación visual del impacto de los inductores clave del negocio.", GOLD),
-    ("◑", "Versiones y escenarios",
-     "Compara Actual, Budget y Forecast; simula hipótesis 'what-if'.", BLUE),
-    ("☷", "Allocations",
-     "Reparte costes e ingresos según reglas y criterios de asignación.", TEAL),
-    ("⌘", "Predictive Planning",
-     "Genera previsiones automáticas con machine learning integrado.", GOLD),
+    ("◈", "Planificar en un solo lugar",
+     "Presupuestos y previsiones ordenados, sin hojas sueltas.", BLUE),
+    ("?", "Escenarios «¿y si...?»",
+     "Simular decisiones antes de tomarlas, en minutos.", TEAL),
+    ("◑", "Plan frente a realidad",
+     "Comparar lo previsto con lo real, al instante.", GOLD),
+    ("✦", "Previsiones con IA",
+     "Proyecciones automáticas, sin fórmulas complicadas.", BLUE),
+    ("⧉", "Colaborar entre áreas",
+     "Finanzas, ventas y RR. HH. sobre los mismos números.", TEAL),
+    ("▤", "Información clara",
+     "Cuadros de mando visuales y en tiempo real para decidir.", GOLD),
 ]
 gx0, gy0 = Inches(0.85), Inches(2.35)
 cw, chh = Inches(3.83), Inches(1.95)
@@ -402,82 +385,87 @@ footer(s, pnum())
 
 
 # ============================================================================
-# SLIDE 7 — EL CICLO DE PLANIFICACIÓN
+# SLIDE 7 — ANTES Y DESPUÉS
 # ============================================================================
 s = slide(); bg(s, LIGHT)
-page_header(s, "Proceso", "El ciclo de planificación en SAC")
+page_header(s, "El cambio", "Antes y después")
 txt(s, Inches(0.85), Inches(1.6), Inches(11.6), Inches(0.5),
-    [one("Un flujo continuo y cerrado que conecta el análisis del pasado con la decisión sobre el futuro.",
+    [one("Cómo cambia el día a día de la planificación al pasar a una única plataforma.",
          14, GREY, FONT_T, False)], space_after=0)
 
-flow = [
-    ("1", "Integrar", "Conectar datos reales de SAP y de terceros.", BLUE),
-    ("2", "Modelar", "Definir dimensiones, versiones y reglas de cálculo.", TEAL),
-    ("3", "Planificar", "Presupuestar y proyectar de forma colaborativa.", GOLD),
-    ("4", "Simular", "Evaluar escenarios y análisis 'what-if'.", BLUE),
-    ("5", "Analizar", "Comparar plan vs. real y medir desviaciones.", TEAL),
-]
-n = len(flow)
-x0 = Inches(0.85)
-total = Inches(11.63)
-cw = Inches(2.05)
-gap = (total - cw*n) / (n-1)
-y = Inches(2.7)
-for i,(num, h, d, col) in enumerate(flow):
-    x = x0 + i*(cw+gap)
-    card = rect(s, x, y, cw, Inches(2.9), CARD, shape=MSO_SHAPE.ROUNDED_RECTANGLE)
-    soft_shadow(card)
-    rect(s, x, y, cw, Inches(0.7), col, shape=MSO_SHAPE.ROUND_2_SAME_RECTANGLE)
-    icon_circle(s, x+cw/2-Inches(0.5), y+Inches(0.28), Inches(1.0), NAVY, num, 26, WHITE)
-    txt(s, x+Inches(0.1), y+Inches(1.4), cw-Inches(0.2), Inches(0.45),
-        [one(h, 16, DARKTXT, FONT_H, True)], align=PP_ALIGN.CENTER, space_after=0)
-    txt(s, x+Inches(0.18), y+Inches(1.9), cw-Inches(0.36), Inches(0.9),
-        [one(d, 11.5, GREY, FONT_T, False)], align=PP_ALIGN.CENTER, line_spacing=1.18, space_after=0)
-    if i < n-1:
-        ar = rect(s, x+cw+Inches(0.02), y+Inches(1.15), gap-Inches(0.04), Inches(0.4),
-                  col, shape=MSO_SHAPE.CHEVRON)
-# ciclo cerrado
-band = rect(s, Inches(0.85), Inches(5.95), Inches(11.63), Inches(0.72), NAVY, shape=MSO_SHAPE.ROUNDED_RECTANGLE)
-txt(s, Inches(1.1), Inches(6.06), Inches(11.2), Inches(0.5),
-    [[("↻  ", 15, GOLD, FONT_H, True),
-      ("Proceso cíclico y continuo: ", 13.5, WHITE, FONT_H, True),
-      ("los resultados del análisis retroalimentan el siguiente ciclo de planificación.",
-       13.5, RGBColor(0xC7,0xD6,0xE3), FONT_T, False)]],
+# columna ANTES
+ax, aw = Inches(0.85), Inches(5.6)
+ca = rect(s, ax, Inches(2.3), aw, Inches(4.1), CARD, shape=MSO_SHAPE.ROUNDED_RECTANGLE)
+soft_shadow(ca)
+head = rect(s, ax, Inches(2.3), aw, Inches(0.95), TERRA, shape=MSO_SHAPE.ROUND_2_SAME_RECTANGLE)
+txt(s, ax+Inches(0.4), Inches(2.3), aw-Inches(0.8), Inches(0.95),
+    [[("✕  ", 18, WHITE, FONT_H, True),("Hoy, con hojas de cálculo", 17, WHITE, FONT_H, True)]],
     anchor=MSO_ANCHOR.MIDDLE, space_after=0)
+antes = ["Datos dispersos y desactualizados",
+         "Semanas para cerrar un presupuesto",
+         "Difícil simular escenarios",
+         "Cada área con su propia versión"]
+iy = Inches(3.55)
+for it in antes:
+    txt(s, ax+Inches(0.4), iy, Inches(0.4), Inches(0.4), [one("—", 15, TERRA, FONT_H, True)], space_after=0)
+    txt(s, ax+Inches(0.85), iy+Inches(0.02), aw-Inches(1.2), Inches(0.6),
+        [one(it, 13.5, DARKTXT, FONT_T, False)], line_spacing=1.15, space_after=0)
+    iy += Inches(0.65)
+
+# flecha central
+icon_circle(s, Inches(6.42), Inches(4.05), Inches(0.75), NAVY, "→", 26, GOLD)
+
+# columna DESPUÉS
+dx, dw = Inches(7.25), Inches(5.6)
+cd = rect(s, dx, Inches(2.15), dw, Inches(4.4), NAVY, shape=MSO_SHAPE.ROUNDED_RECTANGLE)
+soft_shadow(cd)
+head2 = rect(s, dx, Inches(2.15), dw, Inches(0.95), GREEN, shape=MSO_SHAPE.ROUND_2_SAME_RECTANGLE)
+txt(s, dx+Inches(0.4), Inches(2.15), dw-Inches(0.8), Inches(0.95),
+    [[("✔  ", 18, WHITE, FONT_H, True),("Con SAP Analytics Cloud", 17, WHITE, FONT_H, True)]],
+    anchor=MSO_ANCHOR.MIDDLE, space_after=0)
+despues = ["Una única fuente de datos fiable",
+           "Ciclos de días, no de semanas",
+           "Escenarios en minutos",
+           "Toda la organización alineada"]
+iy = Inches(3.45)
+for it in despues:
+    icon_circle(s, dx+Inches(0.4), iy, Inches(0.34), GREEN, "✔", 12)
+    txt(s, dx+Inches(0.9), iy-Inches(0.02), dw-Inches(1.25), Inches(0.6),
+        [one(it, 13.5, WHITE, FONT_H, True)], line_spacing=1.15, space_after=0)
+    iy += Inches(0.72)
 footer(s, pnum())
 
 
 # ============================================================================
-# SLIDE 8 — CASOS DE USO
+# SLIDE 8 — CASOS DE USO POR ÁREA
 # ============================================================================
 s = slide(); bg(s, LIGHT)
-page_header(s, "Aplicación", "Casos de uso de Planning")
+page_header(s, "Aplicación", "Valor para cada área")
 txt(s, Inches(0.85), Inches(1.6), Inches(11.6), Inches(0.5),
-    [one("La planificación se extiende a todas las áreas de la organización sobre un mismo modelo integrado.",
+    [one("La misma plataforma da respuesta a las necesidades de las principales áreas de la empresa.",
          14, GREY, FONT_T, False)], space_after=0)
 
 cases = [
-    ("Finanzas (FP&A)", BLUE, [
-        "Presupuesto anual y rolling forecast",
-        "Estados financieros integrados (P&L, balance, cash-flow)",
-        "Consolidación y análisis de desviaciones"]),
-    ("Ventas e Ingresos", TEAL, [
-        "Planificación comercial y de cuotas",
-        "Previsión de demanda por producto y región",
-        "Simulación de precios y márgenes"]),
+    ("Finanzas", BLUE, [
+        "Presupuesto anual y revisiones periódicas",
+        "Visión completa de resultados y tesorería",
+        "Control claro de desviaciones"]),
+    ("Ventas", TEAL, [
+        "Objetivos comerciales por equipo y zona",
+        "Previsión de ventas y demanda",
+        "Impacto de precios en el margen"]),
     ("Recursos Humanos", GOLD, [
-        "Planificación de plantilla y costes laborales",
-        "Escenarios de contratación y retribución",
-        "Alineación de capacidad con la demanda"]),
+        "Planificación de plantilla y costes",
+        "Escenarios de contratación",
+        "Capacidad alineada con la demanda"]),
 ]
-cx = Inches(0.85)
-cw = Inches(3.83)
+cx = Inches(0.85); cw = Inches(3.83)
 for name, col, items in cases:
     card = rect(s, cx, Inches(2.35), cw, Inches(4.05), CARD, shape=MSO_SHAPE.ROUNDED_RECTANGLE)
     soft_shadow(card)
-    head = rect(s, cx, Inches(2.35), cw, Inches(0.95), col, shape=MSO_SHAPE.ROUND_2_SAME_RECTANGLE)
+    rect(s, cx, Inches(2.35), cw, Inches(0.95), col, shape=MSO_SHAPE.ROUND_2_SAME_RECTANGLE)
     txt(s, cx+Inches(0.35), Inches(2.35), cw-Inches(0.7), Inches(0.95),
-        [one(name, 17, WHITE, FONT_H, True)], anchor=MSO_ANCHOR.MIDDLE, space_after=0)
+        [one(name, 18, WHITE, FONT_H, True)], anchor=MSO_ANCHOR.MIDDLE, space_after=0)
     iy = Inches(3.55)
     for it in items:
         rect(s, cx+Inches(0.38), iy+Inches(0.09), Inches(0.14), Inches(0.14), col, shape=MSO_SHAPE.OVAL)
@@ -489,42 +477,41 @@ footer(s, pnum())
 
 
 # ============================================================================
-# SLIDE 9 — BENEFICIOS
+# SLIDE 9 — IMPACTO Y BENEFICIOS
 # ============================================================================
 s = slide(); bg(s, LIGHT)
-page_header(s, "Valor de negocio", "Beneficios clave")
+page_header(s, "Valor de negocio", "El impacto para la empresa")
 txt(s, Inches(0.85), Inches(1.6), Inches(11.6), Inches(0.5),
-    [one("Por qué las organizaciones eligen SAP Analytics Cloud para su planificación.",
+    [one("Lo que la dirección gana al adoptar una planificación conectada e inteligente.",
          14, GREY, FONT_T, False)], space_after=0)
 
-# métricas destacadas
-metrics = [("1", "plataforma", "Analítica y planificación unificadas", BLUE),
-           ("+", "colaboración", "Áreas y responsables trabajando juntos", TEAL),
-           ("<>", "agilidad", "Del forecast anual al continuo", GOLD),
-           ("AI", "inteligencia", "Predicciones con machine learning", NAVY)]
+metrics = [("+", "rapidez", "Ciclos de días, no de semanas", BLUE),
+           ("✔", "confianza", "Una sola versión de los números", TEAL),
+           ("↗", "anticipación", "Ver el futuro antes de que llegue", GOLD),
+           ("⧉", "alineación", "Toda la empresa, un mismo plan", NAVY)]
 mx = Inches(0.85); mw = Inches(2.83)
 for tag, big, d, col in metrics:
     card = rect(s, mx, Inches(2.35), mw, Inches(1.7), col, shape=MSO_SHAPE.ROUNDED_RECTANGLE)
     soft_shadow(card)
     txt(s, mx+Inches(0.3), Inches(2.5), mw-Inches(0.6), Inches(0.7),
-        [[(tag+" ", 30, WHITE, FONT_H, True),(big, 16, RGBColor(0xDD,0xE7,0xF0), FONT_L, False)]],
+        [[(tag+"  ", 30, WHITE, FONT_H, True),(big, 16, RGBColor(0xDD,0xE7,0xF0), FONT_L, False)]],
         space_after=0)
     txt(s, mx+Inches(0.3), Inches(3.35), mw-Inches(0.6), Inches(0.6),
         [one(d, 11.5, RGBColor(0xE6,0xED,0xF3), FONT_T, False)], line_spacing=1.15, space_after=0)
     mx += Inches(3.0)
 
 benefits = [
-    ("Una sola fuente de la verdad", "Todos planifican sobre los mismos datos gobernados."),
-    ("Ciclos más rápidos", "Automatización de cálculos y forecasts recurrentes."),
-    ("Mejores decisiones", "Escenarios, simulaciones y predicción integrados."),
-    ("Escalable en la nube", "Sin infraestructura; se adapta al crecimiento."),
+    ("Decisiones más rápidas", "Menos tiempo recopilando datos, más tiempo decidiendo."),
+    ("Menos riesgo de error", "Adiós a los fallos manuales de las hojas de cálculo."),
+    ("Mejor visión del futuro", "Escenarios y previsiones siempre a mano."),
+    ("Crece con la empresa", "En la nube, sin grandes inversiones iniciales."),
 ]
 by = Inches(4.5)
 for i,(h,d) in enumerate(benefits):
     r,c = divmod(i,2)
     x = Inches(0.85) + c*Inches(5.95)
     y = by + r*Inches(0.98)
-    icon_circle(s, x, y, Inches(0.5), TEAL, "✔", 16)
+    icon_circle(s, x, y, Inches(0.5), GREEN, "✔", 16)
     txt(s, x+Inches(0.7), y-Inches(0.03), Inches(5.0), Inches(0.35),
         [one(h, 14.5, DARKTXT, FONT_H, True)], space_after=0)
     txt(s, x+Inches(0.7), y+Inches(0.33), Inches(5.0), Inches(0.4),
@@ -544,15 +531,15 @@ txt(s, Inches(1.25), Inches(2.15), Inches(9), Inches(0.5),
     [one("EN RESUMEN", 13, TEAL, FONT_H, True)], space_after=0)
 txt(s, Inches(1.22), Inches(2.75), Inches(11), Inches(1.6),
     [ one("Planificar el futuro,", 40, WHITE, FONT_H, True),
-      one("con los datos del presente.", 40, GOLD, FONT_L, False) ],
+      one("con datos en los que confiar.", 40, GOLD, FONT_L, False) ],
     line_spacing=1.03, space_after=2)
 txt(s, Inches(1.25), Inches(4.7), Inches(10.3), Inches(1.0),
-    [one("SAP Analytics Cloud Planning unifica análisis y planificación en una "
-         "sola plataforma en la nube: colaborativa, inteligente y conectada.",
+    [one("SAP Analytics Cloud reúne análisis y planificación en una sola "
+         "plataforma: más ágil, más fiable y alineada con toda la empresa.",
          16, RGBColor(0xC7,0xD6,0xE3), FONT_T, False)], line_spacing=1.3, space_after=0)
 
 txt(s, Inches(1.25), Inches(6.4), Inches(9), Inches(0.4),
-    [[("¿Preguntas?  ", 14, WHITE, FONT_H, True),
+    [[("¿Hablamos?  ", 14, WHITE, FONT_H, True),
       ("Gracias por su atención.", 14, RGBColor(0x8A,0x9C,0xAD), FONT_T, False)]], space_after=0)
 
 
