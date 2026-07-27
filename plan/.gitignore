@@ -1,0 +1,5 @@
+# Artefactos generados por build_plan.py
+rows.json
+*.pdf
+# El entregable se versiona en la raíz del repo
+Plan_Seguimiento_Configuracion_SAC.xlsx
