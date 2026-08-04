@@ -125,7 +125,7 @@ def transprensa():
         f"{OUT}/transprensa_arq.png", "Transprensa S.A.S.",
         sources=["SAP S/4HANA\n(SKA1 · CEPC · CSKS · ACDOCA)",
                  "Silotrans / Silotrack\n(kg · remesas · tarifas)",
-                 "Excel / Power BI\n(proceso actual)"],
+                 "Excel\n(proceso actual)"],
         integration="SAP DataSphere\n\nIntegración,\nvirtualización\ny maestros",
         dims="SOCIEDAD_TRANS\nCEBE_TRANS (regional)\nCECOS_TRANS · CUENTA\nSERVICIO · CLIENTE\nMONEDA · AUDITORIA\nVersion · Date",
         ingresos_label="Modelo de Ingresos\nP×Q por regional y servicio",
