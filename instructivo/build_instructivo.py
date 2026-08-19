@@ -12,6 +12,10 @@ TPL=os.path.join(HERE,'..','plan_fs','template_funcional.docx')
 LOGO_BUILD=os.path.join(HERE,'..','plan_fs','logos','build.png')
 LOGO_FAN=os.path.join(HERE,'..','plan_fs','logos','fanalca.png')
 DIAG=os.path.join(HERE,'img','sharepoint_sac_flujo.png')
+IMG=os.path.join(HERE,'img')
+def fig(name, n, desc):
+    b.figure(os.path.join(IMG,name),
+             f"Figura {n}. Ilustración esquemática — {desc} (los números corresponden a los pasos).")
 
 b=Builder(TPL); b.setup_headers(LOGO_FAN)
 hp=b.doc.sections[0].header.paragraphs[0]
@@ -116,6 +120,10 @@ b.callout("Importante — deprecación de la autenticación ACS", [
 # 4. PROCEDIMIENTO
 # =====================================================================
 b.h1("Procedimiento")
+b.callout("Sobre las figuras de este apartado",
+          "Las imágenes son ilustraciones esquemáticas de las pantallas (wireframes), no capturas reales. "
+          "Los rótulos numerados corresponden a los pasos de la tabla de cada fase. La interfaz real de SAP "
+          "puede variar según la versión.", accent=NAVY2)
 
 b.h2("Fase 1 — Habilitar Open Connectors en SAC (una sola vez)")
 b.para("Si Open Connectors aún no está integrado en su inquilino de SAC, realice esta configuración una "
@@ -126,6 +134,7 @@ steps([["1","Abrir la configuración","En SAC: menú lateral → Administración
        ["4","Ingresar el User Secret","Introducir el «Open Connectors User Secret»."],
        ["5","Ingresar el Organization Secret","Introducir el «Open Connectors Organization Secret»."],
        ["6","Guardar","Confirmar. Los secretos se obtienen en Open Connectors (perfil / API Keys)."]])
+fig("paso1_sac_openconnectors.png", 2, "integración de Open Connectors en SAP Analytics Cloud")
 
 b.h2("Fase 2 — Registrar la aplicación OAuth en Microsoft")
 b.para("Registre una aplicación que autorice a Open Connectors a acceder a SharePoint y obtenga el Client "
@@ -135,9 +144,11 @@ steps([["1","Acceder al registro de apps","Azure Portal → «App registrations�
        ["3","Generar el Client Secret","Crear un secreto y copiar su valor de inmediato."],
        ["4","Configurar el Redirect URI","Usar la Callback URL de Open Connectors como URI de redirección."],
        ["5","Otorgar permisos","Conceder los permisos de SharePoint requeridos (p. ej., alcance AllSites.Manage)."]])
+fig("paso2a_azure_appreg.png", 3, "registro de la aplicación en Azure (Microsoft Entra ID)")
 b.callout("Guarde el Client Secret", "El valor del Client Secret solo se muestra una vez y no puede "
           "recuperarse después. Guárdelo en un lugar seguro; si se pierde, deberá generar uno nuevo.",
           accent=NAVY2, fill="FFF7E6", icon="⚠")
+fig("paso2b_azure_secret.png", 4, "generación del Client Secret en Azure")
 
 b.h2("Fase 3 — Crear la instancia del conector SharePoint en Open Connectors")
 b.para("En Open Connectors, cree y autentique una instancia del conector de SharePoint con las "
@@ -154,6 +165,7 @@ b.callout("Correspondencia de credenciales", [
     "Client Secret  →  API Secret (oauth.api.secret)",
     "Redirect URI  →  Callback URL (oauth.callback.url)",
 ], accent=NAVY2)
+fig("paso3_openconnectors_instance.png", 5, "instancia del conector SharePoint en Open Connectors")
 
 b.h2("Fase 4 — Crear la conexión de importación a SharePoint en SAC")
 b.para("Con Open Connectors integrado (Fase 1) y la instancia creada (Fase 3), cree la conexión de "
@@ -171,12 +183,14 @@ steps([["1","Abrir Conexiones","En SAC: Conexiones (o «Adquirir datos» dentro 
 b.callout("Elimine el prefijo «https://»", "En el campo «SharePoint Site Address» la dirección NO debe "
           "incluir «https://»; escríbala como dominio.sharepoint.com/sites/… De lo contrario, la conexión fallará.",
           accent=RED, fill="FDECEA", icon="⚠")
+fig("paso4_sac_conexion.png", 6, "conexión de importación a SharePoint en SAP Analytics Cloud")
 
 b.h2("Fase 5 — Verificación y uso")
 steps([["1","Crear un modelo","Nuevo modelo → «Adquirir datos» → seleccionar la conexión de SharePoint."],
        ["2","Elegir el recurso","Seleccionar la biblioteca/consulta o el archivo a importar."],
        ["3","Previsualizar y cargar","Revisar los datos, aplicar transformaciones e importar."],
        ["4","Construir","Usar los datos en modelos e historias de SAC."]])
+fig("paso5_sac_importar.png", 7, "adquisición e importación de datos en SAP Analytics Cloud")
 
 # =====================================================================
 # 5. REFERENCIA DE CAMPOS
