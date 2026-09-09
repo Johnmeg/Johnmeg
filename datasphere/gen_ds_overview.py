@@ -25,10 +25,10 @@ for (t,),oy in zip(opts,oys):
     arrow(ax,(11+17/2, midy),(ocx-ow/2, oy), color=GREY, lw=1.4, rad=0.05)
     arrow(ax,(ocx+ow/2, oy),(70-17/2, midy), color=NAVY, lw=1.6, rad=-0.05)
 # Datasphere
-header_box(ax, 70, midy, 17, 13, "SAP\nDatasphere", "Tabla local +\nVista analítica\n(Space)", hc=BLUE, fs=8.2, wrap=16)
+header_box(ax, 70, midy, 17, 13, "SAP\nDatasphere", "Tabla presupuesto\n-> Vista analítica", hc=BLUE, fs=8.2, wrap=16)
 stage_label(ax, 70, top-8.5, "MODELADO", color=BLUE)
 # SAC
-box(ax, 90, midy, 15, 11, "SAP Analytics\nCloud\n(Ppto Comercial)", fc=LBLUE, ec=NAVY, tc="#1A1A1A", bold=True, fs=8.2, wrap=16)
+box(ax, 90, midy, 15, 11, "Power BI  /  SAP\nAnalytics Cloud", fc=LBLUE, ec=NAVY, tc="#1A1A1A", bold=True, fs=8.2, wrap=16)
 stage_label(ax, 90, top-8.5, "CONSUMO", color=NAVY)
 arrow(ax,(70+17/2, midy),(90-15/2, midy), color=NAVY, lw=2.2)
 ax.text(3, 3.0, "El detalle de campos (dimensiones y medidas) y su aplicabilidad por sociedad se define en la sección de modelo de datos.",
