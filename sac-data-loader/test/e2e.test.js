@@ -120,6 +120,10 @@ test('flujo completo: login, validar, validar en SAC, cargar', async (t) => {
   const anon = await fetch(`${stack.appUrl}/api/templates`);
   assert.equal(anon.status, 401);
 
+  const health = await fetch(`${stack.appUrl}/healthz`);
+  assert.equal(health.status, 200);
+  assert.equal(health.headers.get('set-cookie'), null);
+
   const { json } = await login(stack);
   const me = await json('GET', '/api/me');
   assert.equal(me.body.user.name, 'Ana Planeación');

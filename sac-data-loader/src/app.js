@@ -46,7 +46,13 @@ function createApp(cfg, { audit = () => {}, logger = console } = {}) {
     next();
   });
 
+  // Verificación de salud para el balanceador / plataforma (no crea sesión)
+  app.get('/healthz', (req, res) => res.type('text').send('ok'));
+
+  // Sesiones en memoria: una sola instancia. El barrido periódico elimina las vencidas.
+  const sessionStore = new session.MemoryStore();
   app.use(session({
+    store: sessionStore,
     name: 'sacloader.sid',
     secret: cfg.sessionSecret,
     resave: false,
@@ -66,6 +72,7 @@ function createApp(cfg, { audit = () => {}, logger = console } = {}) {
   // Limpieza periódica de sesiones de SAC y archivos validados vencidos
   const sweeper = setInterval(() => {
     const now = Date.now();
+    sessionStore.all(() => {}); // MemoryStore borra las sesiones vencidas al recorrerlas
     for (const [k, v] of vault) if (now - v.lastSeen > cfg.sessionMinutes * 60 * 1000) vault.delete(k);
     for (const [k, u] of uploads) {
       if (now - u.createdAt > UPLOAD_TTL_MS && u.job?.state !== 'RUNNING') {

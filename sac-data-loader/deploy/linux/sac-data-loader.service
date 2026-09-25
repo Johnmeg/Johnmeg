@@ -1,0 +1,24 @@
+# /etc/systemd/system/sac-data-loader.service
+[Unit]
+Description=Cargador de datos a SAC - Ciudad Limpia
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sacloader
+Group=sacloader
+WorkingDirectory=/opt/sac-data-loader
+ExecStart=/usr/bin/node server.js
+Environment=NODE_ENV=production
+Restart=on-failure
+RestartSec=5
+# Endurecimiento: sólo puede escribir en logs/
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/sac-data-loader/logs
+
+[Install]
+WantedBy=multi-user.target

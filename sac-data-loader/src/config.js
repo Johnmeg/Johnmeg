@@ -48,6 +48,7 @@ function loadConfig(env = process.env) {
   const baseUrl = String(env.APP_BASE_URL || `http://localhost:${port}`).replace(/\/+$/, '');
   const cfg = {
     port,
+    host: env.HOST || undefined, // 127.0.0.1 = sólo accesible desde el proxy del mismo servidor
     baseUrl,
     sac: {
       tenantUrl: String(env.SAC_TENANT_URL || '').replace(/\/+$/, ''),
