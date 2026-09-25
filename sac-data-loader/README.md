@@ -155,7 +155,7 @@ Campos disponibles por modelo:
 - El reporte CSV neutraliza fórmulas (`=`, `+`, `-`, `@`) para evitar inyección en Excel.
 - La auditoría (`logs/audit.log`, JSON por línea) **no guarda valores financieros**: sólo conteos y la huella SHA-256 del archivo.
 
-**Despliegue** (guía completa paso a paso en [`DESPLIEGUE.md`](DESPLIEGUE.md): Windows/IIS, Linux/nginx, SAP BTP y Docker)
+**Despliegue** (guía completa paso a paso en [`DESPLIEGUE.md`](DESPLIEGUE.md): Windows/IIS, Linux/nginx, SAP BTP, Docker e instalación en el computador de cada usuario)
 - Publique detrás de HTTPS (`APP_BASE_URL=https://…`, `TRUST_PROXY=true` si hay proxy inverso).
 - Las sesiones y los archivos validados se guardan en memoria. Use **una sola instancia**, o cambie el store de `express-session` por Redis si necesita varias.
 - También puede desplegarse en SAP BTP (Cloud Foundry) como aplicación Node.js.

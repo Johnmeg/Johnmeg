@@ -35,6 +35,7 @@ Cada usuario sigue entrando con **sus propias credenciales de SAP Analytics Clou
 | **B. Linux + nginx** | Si TI prefiere servidores Linux |
 | **C. SAP BTP (Cloud Foundry)** | Si Fanalca tiene subcuenta BTP. No requiere servidor propio y trae HTTPS incluido |
 | **D. Docker** | Si TI ya opera contenedores |
+| **E. Computador de cada usuario** | Pocos usuarios o mientras no haya servidor. Instalador con doble clic, sin permisos de administrador |
 
 ---
 
@@ -268,6 +269,47 @@ docker run -d --name sac-data-loader --restart unless-stopped \
 - En `produccion.env` **no** ponga `HOST=127.0.0.1`. El contenedor debe escuchar en todas sus interfaces; el `-p 127.0.0.1:…` ya limita el acceso.
 - Delante del contenedor va un proxy HTTPS (nginx o IIS) como en las opciones A o B, o el balanceador de su plataforma.
 - La auditoría sale por `docker logs sac-data-loader`.
+
+---
+
+## Opción E: en el computador de cada usuario (sin servidor)
+
+Para pocos usuarios, o mientras no haya servidor, cada persona puede instalar la aplicación en su propio computador.
+
+**Cómo funciona:**
+- La aplicación corre en segundo plano y se abre en `http://localhost:3000`.
+- **No requiere permisos de administrador:** trae su propio Node.js portátil y se instala en `%LOCALAPPDATA%\CargadorSAC`.
+- Cada usuario entra con **su** usuario de SAC.
+
+| Ventajas | Limitaciones |
+|---|---|
+| No requiere servidor, DNS ni certificado | El Secret del cliente OAuth queda en el computador de cada usuario |
+| Instalación con doble clic y acceso directo en el escritorio | Cada usuario debe reinstalar cuando haya una versión nueva |
+| Cada usuario usa sus propios permisos de SAC | La auditoría queda en cada computador (`app\logs\audit.log`) |
+
+### E1. Preparar el paquete (lo hace el administrador, una vez)
+1. En SAC, el cliente OAuth (*Interactive Usage*) debe tener la Redirect URI **`http://localhost:3000/auth/callback`**. Es la misma que ya usa en su computador.
+2. En su computador, desde la carpeta `sac-data-loader`, arme el paquete pasándole un `.env` que ya funcione:
+   ```
+   powershell -ExecutionPolicy Bypass -File .\deploy\windows-usuario\Crear-Paquete.ps1 -ConfigEmpresa C:\ruta\sac-data-loader\.env
+   ```
+   Genera `CargadorSAC-Instalador.zip`. Del `.env` solo se copian los datos de SAC al archivo `config-empresa.env`, para que los usuarios no tengan que escribirlos. Cada usuario recibe su propia clave de sesión.
+   - Sin `-ConfigEmpresa`, el instalador pedirá los datos de SAC a cada usuario.
+3. Comparta el ZIP **solo con usuarios autorizados**, por ejemplo en una carpeta de Teams o SharePoint con acceso restringido, porque contiene el Secret.
+
+### E2. Instalar (cada usuario)
+1. Extraer **todo** el ZIP (clic derecho → *Extraer todo…*).
+2. Doble clic en **`Instalar.cmd`**. Tarda entre 2 y 5 minutos; descarga Node.js portátil y las librerías.
+3. Al terminar se abre la aplicación y queda el acceso directo **"Cargador de datos a SAC"** en el escritorio y en el menú Inicio.
+
+**Instrucciones y opciones para los usuarios** (vienen en el `LEAME.txt` del paquete):
+- **Usar:** doble clic en el acceso directo.
+- **Cerrar:** menú Inicio → *Detener Cargador de datos a SAC*.
+- **Desinstalar:** menú Inicio → *Desinstalar Cargador de datos a SAC*.
+- **Actualizar:** ejecutar el `Instalar.cmd` de la versión nueva; se conservan la configuración y los registros.
+- **Red con proxy:** `Instalar.cmd -Proxy http://<proxy>:<puerto>`.
+- **Sin acceso a nodejs.org:** `Instalar.cmd -NodeZip C:\ruta\node-v22.x.x-win-x64.zip`.
+- **Registros para soporte:** `%LOCALAPPDATA%\CargadorSAC\instalacion.log` y `%LOCALAPPDATA%\CargadorSAC\app\logs\app.log`.
 
 ---
 
