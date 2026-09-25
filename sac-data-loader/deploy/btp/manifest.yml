@@ -1,0 +1,22 @@
+# SAP BTP, Cloud Foundry.  Uso (desde la carpeta sac-data-loader):
+#   cf push -f deploy/btp/manifest.yml --var host=cargas-sac-cl --var domain=cfapps.us21.hana.ondemand.com
+# Los secretos NO van aquí: se cargan con "cf set-env" (vea DESPLIEGUE.md).
+applications:
+  - name: sac-data-loader
+    path: ../..
+    memory: 256M
+    instances: 1            # las sesiones viven en memoria: una sola instancia
+    buildpacks:
+      - nodejs_buildpack
+    command: node server.js
+    health-check-type: http
+    health-check-http-endpoint: /healthz
+    routes:
+      - route: ((host)).((domain))
+    env:
+      NODE_ENV: production
+      APP_BASE_URL: https://((host)).((domain))
+      TRUST_PROXY: "true"
+      AUDIT_FILE: stdout
+      BLOCKED_VERSIONS: public.Actual
+      SAC_DEBUG: "false"

@@ -1,0 +1,44 @@
+{
+  "_ayuda": "Catálogo de cargas: una entrada por modelo de SAC. El archivo trae como encabezados los nombres reales de las dimensiones del modelo (columns = \"byName\"). Los periodos pueden venir en columnas (Ene 2026, 202601…) o en una columna Date con la medida en Importe. La versión se elige en pantalla. 'model' se busca primero por 'id' y, si no existe, por 'name'. 'defaultValues' se usa cuando la columna no viene en el archivo. 'importMethods': Update = reemplaza el valor de la celda; CleanAndReplace = borra primero lo que coincida con 'cleanAndReplaceScope'.",
+  "defaults": {
+    "numberLocale": "es",
+    "layout": "auto",
+    "columns": "byName",
+    "measure": "Importe",
+    "importMethods": ["Update"],
+    "contextFields": { "Versión": "Version" },
+    "ignoreColumns": [
+      { "name": "Total", "note": "Los totales se calculan en SAC." },
+      { "name": "Observaciones" },
+      { "name": "Comentarios" }
+    ],
+    "rules": { "allowNegative": true, "skipZeroValues": false, "maxDecimals": 7 }
+  },
+  "templates": [
+    {
+      "id": "CL_GASTOS",
+      "name": "Gastos Ciudad Limpia",
+      "model": { "id": "Cl2fsrpi6n57id7iqdnck2m2p5t", "name": "Modelo Gastos Ciudad Limpia" }
+    },
+    {
+      "id": "CL_INGRESO",
+      "name": "Ingreso Ciudad Limpia",
+      "model": { "id": "Cdtrt4eesot3vn57g9a9ve57v5o", "name": "Modelo Ingreso Ciudad Limpia" },
+      "defaultValues": { "Cliente": "#", "Regional": "#" },
+      "importMethods": ["Update", "CleanAndReplace"],
+      "cleanAndReplaceScope": ["Version", "Date", "Sociedad_CL", "Auditoria_CL"]
+    },
+    {
+      "id": "CL_EEFF",
+      "name": "EEFF Ciudad Limpia",
+      "model": { "id": "Cmnpu7ouleh31l4491314lip574", "name": "Modelo EEFF Ciudad Limpia" }
+    },
+    {
+      "id": "OTRO",
+      "name": "Otro modelo (elegir de la lista)",
+      "description": "Cualquier modelo al que tenga acceso. Los encabezados del archivo deben llamarse igual que las dimensiones del modelo.",
+      "model": { "selectable": true },
+      "measure": null
+    }
+  ]
+}

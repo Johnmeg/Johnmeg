@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Carga de datos a SAC · Ciudad Limpia</title>
+  <link rel="icon" type="image/png" href="img/logo-ciudad-limpia.png">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="utilbar">
+    <div class="wrap utilbar-inner">
+      <span class="util-label">Planeación financiera · SAP Analytics Cloud</span>
+      <div class="user" id="userBox" hidden>
+        <span class="avatar" id="userInitials" aria-hidden="true"></span>
+        <div class="user-text">
+          <span id="userName"></span>
+          <small id="userTenant"></small>
+        </div>
+        <button type="button" class="btn ghost small on-dark" id="logoutBtn">Cerrar sesión</button>
+      </div>
+    </div>
+  </div>
+
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="/" aria-label="Ciudad Limpia · Carga de datos a SAC">
+        <img class="logo logo-color" src="img/logo-ciudad-limpia.png" alt="Ciudad Limpia" width="176" height="54">
+        <img class="logo logo-white" src="img/logo-ciudad-limpia-blanco.png" alt="" width="176" height="54">
+      </a>
+      <span class="app-name">Carga de datos a SAC</span>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="wrap">
+      <p class="kicker">Planeación financiera</p>
+      <h1 class="hero-title">Carga de datos a los modelos de planeación</h1>
+      <p class="hero-text">Valide su archivo de Excel o plano y cárguelo a SAP Analytics Cloud con su propio usuario.</p>
+    </div>
+  </section>
+
+  <main>
+    <!-- ======================================================= inicio de sesión -->
+    <section id="loginView" class="card login" hidden>
+      <h2>Inicie sesión con su usuario de SAP Analytics Cloud</h2>
+      <p>La carga se hace con <b>sus propios permisos</b>: SAC aplica sus roles y el control de acceso a datos
+        (Data Access Control) de cada modelo. Esta aplicación no ve ni guarda su contraseña; la autenticación
+        se hace en la página de inicio de sesión de SAC o de su proveedor de identidad corporativo.</p>
+      <div class="alert error" id="loginError" hidden></div>
+      <a class="btn primary big" href="/auth/login" id="loginBtn">Iniciar sesión con SAP Analytics Cloud</a>
+    </section>
+
+    <!-- ======================================================= aplicación -->
+    <div id="appView" hidden>
+      <ol class="stepper" aria-label="Pasos">
+        <li data-step="1" class="active"><span>1</span>Archivo</li>
+        <li data-step="2"><span>2</span>Validación local</li>
+        <li data-step="3"><span>3</span>Validación en SAC</li>
+        <li data-step="4"><span>4</span>Carga</li>
+      </ol>
+
+      <!-- ---------------------------------------------- paso 1 -->
+      <section class="card" id="step1">
+        <h2>1. Seleccione el modelo y el archivo</h2>
+        <form id="uploadForm" novalidate>
+          <div class="grid">
+            <label class="field">
+              <span>Carga a</span>
+              <select id="templateSel" name="template" required></select>
+              <small id="templateDesc" class="hint"></small>
+            </label>
+
+            <label class="field" id="modelField" hidden>
+              <span>Modelo de destino</span>
+              <select id="modelSel" name="modelId"></select>
+            </label>
+
+            <div class="field">
+              <span>Modelo en SAC</span>
+              <div class="readonly" id="modelName">—</div>
+              <small class="hint" id="columnsHint"></small>
+            </div>
+
+            <label class="field">
+              <span>Versión de destino</span>
+              <select id="versionSel"></select>
+              <input id="versionInput" list="versionList" placeholder="p. ej. public.Plan" hidden autocomplete="off">
+              <datalist id="versionList"></datalist>
+              <small class="hint" id="versionHint"></small>
+            </label>
+
+            <fieldset class="field" id="methodField">
+              <legend>Método de carga</legend>
+              <div id="methodOptions" class="radios"></div>
+              <small class="hint" id="methodHint"></small>
+            </fieldset>
+          </div>
+
+          <label class="drop" id="dropZone">
+            <input type="file" id="fileInput" name="file" accept=".xlsx,.xlsm,.csv,.txt">
+            <span class="drop-icon" aria-hidden="true">⬆</span>
+            <span id="dropText"><b>Arrastre aquí el archivo</b> o haga clic para buscarlo</span>
+            <small id="dropLimits"></small>
+          </label>
+
+          <div class="actions">
+            <button type="submit" class="btn primary" id="validateBtn">Validar archivo</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ---------------------------------------------- paso 2 -->
+      <section class="card" id="step2" hidden>
+        <h2>2. Resultado de la validación local</h2>
+        <div id="resultBanner" class="alert"></div>
+
+        <dl class="facts" id="facts"></dl>
+
+        <div class="tabs" role="tablist">
+          <button type="button" role="tab" class="tab active" data-tab="issues">Hallazgos <span class="count" id="issuesCount"></span></button>
+          <button type="button" role="tab" class="tab" data-tab="totals">Totales por periodo</button>
+          <button type="button" role="tab" class="tab" data-tab="preview">Vista previa</button>
+        </div>
+
+        <div class="tabpanel" id="tab-issues">
+          <div class="filters">
+            <label><input type="checkbox" id="fErrors" checked> Errores <b id="nErrors">0</b></label>
+            <label><input type="checkbox" id="fWarnings" checked> Advertencias <b id="nWarnings">0</b></label>
+          </div>
+          <div class="table-wrap">
+            <table id="issuesTable">
+              <thead><tr><th>Tipo</th><th>Fila</th><th>Columna</th><th>Valor</th><th>Detalle</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="empty" id="issuesEmpty" hidden>Sin hallazgos. ✔</p>
+        </div>
+        <div class="tabpanel" id="tab-totals" hidden>
+          <p class="hint">Compare estos totales con el total de su archivo antes de cargar.</p>
+          <div class="table-wrap narrow"><table id="totalsTable"><thead><tr><th>Periodo</th><th class="num">Total</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div>
+        </div>
+        <div class="tabpanel" id="tab-preview" hidden>
+          <p class="hint">Primeros registros tal como se enviarán a SAC (una fila por combinación y periodo).</p>
+          <div class="table-wrap"><table id="previewTable"><thead></thead><tbody></tbody></table></div>
+        </div>
+
+        <div class="actions">
+          <a class="btn ghost" id="reportBtn" href="#" download>Descargar reporte (CSV)</a>
+          <button type="button" class="btn ghost" id="restartBtn">Cargar otro archivo</button>
+          <button type="button" class="btn primary" id="prepareBtn">Validar en SAC</button>
+        </div>
+      </section>
+
+      <!-- ---------------------------------------------- paso 3 -->
+      <section class="card" id="step3" hidden>
+        <h2>3. Validación en SAP Analytics Cloud</h2>
+        <p class="hint">Los datos se envían a un job de importación y SAC los valida contra el modelo
+          (miembros, jerarquías, permisos y bloqueos) <b>sin escribir nada todavía</b>.</p>
+        <div class="progress" id="prepareProgress" hidden><div class="bar"></div><span>Enviando y validando…</span></div>
+        <div id="prepareResult"></div>
+        <div class="table-wrap" id="rejectedWrap" hidden>
+          <table id="rejectedTable"><thead></thead><tbody></tbody></table>
+        </div>
+        <label class="confirm" id="carConfirm" hidden>
+          <input type="checkbox" id="carCheck">
+          <span id="carText"></span>
+        </label>
+        <div class="actions" id="step3Actions" hidden>
+          <button type="button" class="btn ghost" id="cancelBtn">Cancelar</button>
+          <button type="button" class="btn primary" id="runBtn">Cargar a SAC</button>
+        </div>
+      </section>
+
+      <!-- ---------------------------------------------- paso 4 -->
+      <section class="card" id="step4" hidden>
+        <h2>4. Carga</h2>
+        <div class="progress" id="runProgress"><div class="bar"></div><span id="runText">Escribiendo en el modelo…</span></div>
+        <div id="runResult"></div>
+        <div class="actions">
+          <button type="button" class="btn primary" id="againBtn" hidden>Cargar otro archivo</button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <span>Ciudad Limpia · Planeación financiera</span>
+      <span>Los datos se cargan con su usuario de SAP Analytics Cloud</span>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+</body>
+</html>

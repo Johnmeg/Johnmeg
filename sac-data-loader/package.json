@@ -1,0 +1,25 @@
+{
+  "name": "sac-data-loader",
+  "version": "1.0.0",
+  "description": "Carga validada de archivos Excel/CSV a modelos de planeación de SAP Analytics Cloud (Data Import API) con inicio de sesión OAuth por usuario.",
+  "main": "server.js",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "demo": "node scripts/demo.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "multer": "^2.4.0"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
+  }
+}

@@ -1,0 +1,65 @@
+﻿CARGADOR DE DATOS A SAC - CIUDAD LIMPIA
+Instalación en su computador
+======================================
+
+Qué hace
+--------
+Instala en su computador la aplicación para validar y cargar archivos de Excel o
+CSV a los modelos de planeación de SAP Analytics Cloud. Entra con SU usuario de
+SAC: cada carga se hace con sus propios permisos.
+
+No necesita permisos de administrador. Se instala en:
+  %LOCALAPPDATA%\CargadorSAC
+
+
+Instalar (una sola vez)
+-----------------------
+1. Extraiga TODO este ZIP en una carpeta (clic derecho > Extraer todo...).
+   No ejecute el instalador desde dentro del ZIP.
+2. Doble clic en  Instalar.cmd
+   - Si Windows muestra "Windows protegió su PC", pulse "Más información" >
+     "Ejecutar de todas formas". Si pregunta "¿Desea ejecutar este archivo?",
+     pulse "Ejecutar".
+3. Espere entre 2 y 5 minutos. El instalador descarga Node.js portátil
+   (unos 30 MB) y las librerías de la aplicación.
+4. Si le pide datos de SAC (URL del tenant, Authorization URL, Token URL,
+   Client ID y Secret), pídalos al administrador de SAC. El Secret no se ve
+   al escribirlo; es normal.
+5. Al terminar se abre la aplicación en el navegador y queda el acceso directo
+   "Cargador de datos a SAC" en el escritorio y en el menú Inicio.
+
+
+Usar
+----
+- Doble clic en "Cargador de datos a SAC" (escritorio o menú Inicio).
+- Se abre el navegador en http://localhost:3000
+- Pulse "Iniciar sesión con SAP Analytics Cloud" y entre con su usuario.
+- La aplicación queda funcionando en segundo plano. Para cerrarla:
+  menú Inicio > Cargador de datos a SAC > Detener Cargador de datos a SAC.
+  (Al apagar o reiniciar el computador también se cierra.)
+
+
+Actualizar a una versión nueva
+------------------------------
+Extraiga el ZIP nuevo y ejecute otra vez Instalar.cmd. Se conservan su
+configuración y sus registros.
+
+
+Desinstalar
+-----------
+Menú Inicio > Cargador de datos a SAC > Desinstalar Cargador de datos a SAC.
+
+
+Si algo falla
+-------------
+- "El puerto 3000 está en uso": cierre cualquier ventana negra con
+  "npm start" o "npm run demo" y vuelva a ejecutar Instalar.cmd.
+- "No se pudo descargar Node.js" o "npm ci falló": su red usa proxy.
+  Abra una ventana cmd en esta carpeta y ejecute:
+     Instalar.cmd -Proxy http://<servidor-proxy>:<puerto>
+  (el valor del proxy se lo da TI).
+- Al iniciar sesión, SAC muestra un error de "redirect_uri": el cliente OAuth
+  de SAC debe tener la Redirect URI  http://localhost:3000/auth/callback
+- Registros para soporte:
+     %LOCALAPPDATA%\CargadorSAC\instalacion.log   (instalación)
+     %LOCALAPPDATA%\CargadorSAC\app\logs\app.log (aplicación)
