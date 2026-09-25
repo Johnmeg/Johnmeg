@@ -8,10 +8,15 @@ const path = require('path');
 
 function loadDotEnv(file = path.join(__dirname, '..', '.env')) {
   if (!fs.existsSync(file)) return;
-  for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-    if (!m || process.env[m[1]] !== undefined) continue;
-    process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+  // Si una variable aparece repetida en el archivo, gana la última línea.
+  // Las variables ya definidas en el sistema no se sobrescriben.
+  const values = {};
+  for (const line of fs.readFileSync(file, 'utf8').replace(/^﻿/, '').split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
+    if (m) values[m[1]] = m[2].replace(/^["']|["']$/g, '');
+  }
+  for (const [k, v] of Object.entries(values)) {
+    if (process.env[k] === undefined) process.env[k] = v;
   }
 }
 
@@ -71,9 +76,9 @@ function loadConfig(env = process.env) {
   for (const [k, v] of Object.entries({
     SAC_TENANT_URL: cfg.sac.tenantUrl, SAC_AUTHORIZE_URL: cfg.sac.authorizeUrl, SAC_TOKEN_URL: cfg.sac.tokenUrl,
     SAC_CLIENT_ID: cfg.sac.clientId, SAC_CLIENT_SECRET: cfg.sac.clientSecret, SESSION_SECRET: cfg.sessionSecret,
-  })) if (!v) missing.push(k);
+  })) if (!v || /[<>]/.test(v)) missing.push(k); // "<...>" = texto de ejemplo sin reemplazar
   if (missing.length) {
-    throw new Error(`Faltan variables de configuración: ${missing.join(', ')}. Copie .env.example a .env y complételo.`);
+    throw new Error(`Faltan variables de configuración (vacías o con el texto de ejemplo <...>): ${missing.join(', ')}. Complételas en el archivo .env y guárdelo.`);
   }
   if (cfg.sessionSecret.length < 32) throw new Error('SESSION_SECRET debe tener al menos 32 caracteres aleatorios.');
 
@@ -81,4 +86,4 @@ function loadConfig(env = process.env) {
   return cfg;
 }
 
-module.exports = { loadConfig, loadTemplates };
+module.exports = { loadConfig, loadTemplates, loadDotEnv };

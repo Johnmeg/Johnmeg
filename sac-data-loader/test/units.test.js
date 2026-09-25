@@ -198,3 +198,35 @@ test('validador: archivo sin valores y miembro "#" (sin asignar)', () => {
   ]);
   assert.deepEqual(codes(r), ['SIN_REGISTROS']);
 });
+
+// ---------------------------------------------------------------- configuración
+test('config: en .env gana la última línea repetida y se detecta texto de ejemplo', () => {
+  const fs = require('fs');
+  const os = require('os');
+  const { loadDotEnv, loadConfig } = require('../src/config');
+  const file = require('path').join(fs.mkdtempSync(require('path').join(os.tmpdir(), 'env-')), '.env');
+  fs.writeFileSync(file, [
+    '﻿# comentario',
+    'SESSION_SECRET=',
+    'SAC_AUTHORIZE_URL=https://<subdominio>.authentication.us21.hana.ondemand.com/oauth/authorize',
+    'SAC_CLIENT_ID=',
+    'SESSION_SECRET=0123456789abcdef0123456789abcdef',
+    'SAC_CLIENT_ID=sb-abc!b1|client!b2',
+    'SAC_CLIENT_SECRET=abc$def==',
+  ].join('\r\n'));
+  const keys = ['SESSION_SECRET', 'SAC_AUTHORIZE_URL', 'SAC_CLIENT_ID', 'SAC_CLIENT_SECRET'];
+  const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  keys.forEach((k) => delete process.env[k]);
+  try {
+    loadDotEnv(file);
+    assert.equal(process.env.SESSION_SECRET, '0123456789abcdef0123456789abcdef');
+    assert.equal(process.env.SAC_CLIENT_ID, 'sb-abc!b1|client!b2');
+    assert.equal(process.env.SAC_CLIENT_SECRET, 'abc$def==');
+  } finally {
+    for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  }
+  assert.throws(() => loadConfig({
+    SAC_TENANT_URL: 'https://t', SAC_AUTHORIZE_URL: 'https://<subdominio>/oauth/authorize', SAC_TOKEN_URL: 'https://t/oauth/token',
+    SAC_CLIENT_ID: 'a', SAC_CLIENT_SECRET: 'b', SESSION_SECRET: 'x'.repeat(40),
+  }), /SAC_AUTHORIZE_URL/);
+});
