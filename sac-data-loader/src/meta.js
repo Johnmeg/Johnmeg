@@ -25,11 +25,11 @@ function buildMeta(raw, template = {}) {
 
   const pick = (explicit, candidates, label) => {
     if (explicit) {
-      if (!columns.has(explicit)) throw new ConfigError(`La plantilla indica ${label} "${explicit}", pero el modelo no tiene esa columna.`);
+      if (!columns.has(explicit)) throw new ConfigError(`La configuración (config/templates.json) indica ${label} "${explicit}", pero el modelo no tiene esa columna.`);
       return explicit;
     }
     const found = candidates();
-    if (!found) throw new ConfigError(`No se pudo identificar la columna de ${label} del modelo; indíquela en la plantilla.`);
+    if (!found) throw new ConfigError(`No se pudo identificar la columna de ${label} del modelo; indíquela en config/templates.json.`);
     return found;
   };
 
@@ -40,7 +40,7 @@ function buildMeta(raw, template = {}) {
   const measure = pick(template.measure, () => {
     const nums = [...columns].filter(([, v]) => !v.isKey && NUMERIC.test(v.type || '')).map(([k]) => k);
     if (nums.length > 1) {
-      throw new ConfigError(`El modelo tiene varias medidas (${nums.join(', ')}); indique en la plantilla cuál cargar ("measure").`);
+      throw new ConfigError(`El modelo tiene varias medidas (${nums.join(', ')}); indique en config/templates.json cuál cargar ("measure").`);
     }
     return nums[0];
   }, 'medida');

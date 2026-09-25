@@ -1,8 +1,12 @@
 {
-  "_ayuda": "Catálogo de plantillas de carga. 'model' se resuelve por 'id' o por 'name' (nombre del modelo en SAC). 'columns' mapea encabezado del archivo -> columna del modelo (el texto entre paréntesis del encabezado se ignora). 'fixedValues' se aplica a todas las filas. 'contextFields' lee valores del bloque superior de la plantilla (Versión/Moneda/Auditoría). 'importMethods': Update = reemplazar valor de la celda (estándar del FDD); CleanAndReplace = borra primero lo que coincida con 'cleanAndReplaceScope'.",
+  "_ayuda": "Catálogo de cargas: una entrada por modelo de SAC. El archivo trae como encabezados los nombres reales de las dimensiones del modelo (columns = \"byName\"). Los periodos pueden venir en columnas (Ene 2026, 202601…) o en una columna Date con la medida en Importe. La versión se elige en pantalla. 'model' se busca primero por 'id' y, si no existe, por 'name'. 'defaultValues' se usa cuando la columna no viene en el archivo. 'importMethods': Update = reemplaza el valor de la celda; CleanAndReplace = borra primero lo que coincida con 'cleanAndReplaceScope'.",
   "defaults": {
     "numberLocale": "es",
+    "layout": "auto",
+    "columns": "byName",
+    "measure": "Importe",
     "importMethods": ["Update"],
+    "contextFields": { "Versión": "Version" },
     "ignoreColumns": [
       { "name": "Total", "note": "Los totales se calculan en SAC." },
       { "name": "Observaciones" },
@@ -12,116 +16,29 @@
   },
   "templates": [
     {
-      "id": "PL-01",
-      "name": "Ingresos Ordinarios CL",
-      "description": "Valor total por componente (resumen del Jefe de Tarifas).",
-      "model": { "name": "Modelo Ingreso Ciudad Limpia" },
-      "sheet": "PL-01",
-      "layout": "wide",
-      "measure": "Importe",
-      "columns": { "Sociedad_CL": "Sociedad_CL", "Cebes_CL": "Cebes_CL", "Ratio_CL": "Ratio_CL" },
-      "fixedValues": { "Cliente": "#", "Regional": "#" },
-      "contextFields": { "Versión": "Version", "Moneda": "Moneda_CL", "Auditoría": "Auditoria_CL" },
-      "allowedValues": { "Auditoria_CL": ["PRESUPUESTO_TARIFAS", "MANUAL", "AJUSTE"] },
+      "id": "CL_GASTOS",
+      "name": "Gastos Ciudad Limpia",
+      "model": { "id": "Cl2fsrpi6n57id7iqdnck2m2p5t", "name": "Modelo Gastos Ciudad Limpia" }
+    },
+    {
+      "id": "CL_INGRESO",
+      "name": "Ingreso Ciudad Limpia",
+      "model": { "id": "Cdtrt4eesot3vn57g9a9ve57v5o", "name": "Modelo Ingreso Ciudad Limpia" },
+      "defaultValues": { "Cliente": "#", "Regional": "#" },
       "importMethods": ["Update", "CleanAndReplace"],
       "cleanAndReplaceScope": ["Version", "Date", "Sociedad_CL", "Auditoria_CL"]
     },
     {
-      "id": "PL-02",
-      "name": "Ingresos P×Q — CGS / RH",
-      "description": "Filas de TARIFA y CANTIDAD por cliente; el Importe lo calcula la Data Action CL_CALC_PXQ.",
-      "model": { "name": "Modelo Ingreso Ciudad Limpia" },
-      "sheet": "PL-02",
-      "layout": "wide",
-      "measure": "Importe",
-      "columns": { "Sociedad_CL": "Sociedad_CL", "Cebes_CL": "Cebes_CL", "Cliente": "Cliente", "Ratio_CL": "Ratio_CL" },
-      "fixedValues": { "Regional": "#" },
-      "contextFields": { "Versión": "Version", "Moneda": "Moneda_CL", "Auditoría": "Auditoria_CL" },
-      "ignoreColumns": [
-        { "name": "Tipo_Residuo", "note": "El modelo INGRESO_CL no tiene dimensión de tipo de residuo; agréguela al modelo si se requiere." }
-      ],
-      "allowedValues": { "Auditoria_CL": ["PXQ", "MANUAL", "AJUSTE"], "Ratio_CL": ["TARIFA", "CANTIDAD"] },
-      "rules": { "allowNegative": false },
-      "importMethods": ["Update", "CleanAndReplace"],
-      "cleanAndReplaceScope": ["Version", "Date", "Sociedad_CL", "Auditoria_CL"]
+      "id": "CL_EEFF",
+      "name": "EEFF Ciudad Limpia",
+      "model": { "id": "Cmnpu7ouleh31l4491314lip574", "name": "Modelo EEFF Ciudad Limpia" }
     },
     {
-      "id": "PL-03",
-      "name": "Gastos y Costos (genérica)",
-      "description": "Plantilla estándar para las ~17 áreas.",
-      "model": { "name": "Modelo Gastos Ciudad Limpia" },
-      "sheet": "PL-03",
-      "layout": "wide",
-      "measure": "Importe",
-      "columns": { "Sociedad_CL": "Sociedad_CL", "Cecos_CL": "Cecos_CL", "Cebes_CL": "Cebes_CL", "Cuentas_Egresos_CL": "Cuentas_Egresos_CL" },
-      "contextFields": { "Versión": "Version", "Moneda": "Moneda_CL", "Auditoría": "Auditoria_CL" },
-      "allowedValues": { "Auditoria_CL": ["PRESUPUESTO_EXCEL", "MANUAL", "AJUSTE"] }
-    },
-    {
-      "id": "PL-04",
-      "name": "Mano de Obra / Personal",
-      "model": { "name": "Modelo Gastos Ciudad Limpia" },
-      "sheet": "PL-04",
-      "layout": "wide",
-      "measure": "Importe",
-      "columns": { "Sociedad_CL": "Sociedad_CL", "Cecos_CL": "Cecos_CL", "Cebes_CL": "Cebes_CL", "Cuentas_Egresos_CL": "Cuentas_Egresos_CL" },
-      "contextFields": { "Versión": "Version", "Moneda": "Moneda_CL", "Auditoría": "Auditoria_CL" },
-      "allowedValues": { "Auditoria_CL": ["PRESUPUESTO_EXCEL", "MANUAL", "AJUSTE"] }
-    },
-    {
-      "id": "PL-05",
-      "name": "Costos de Flota (por vehículo)",
-      "model": { "name": "Modelo Gastos Ciudad Limpia" },
-      "sheet": "PL-05",
-      "layout": "wide",
-      "measure": "Importe",
-      "columns": { "Sociedad_CL": "Sociedad_CL", "Cecos_CL": "Cecos_CL", "Cebes_CL": "Cebes_CL", "Cuentas_Egresos_CL": "Cuentas_Egresos_CL" },
-      "contextFields": { "Versión": "Version", "Moneda": "Moneda_CL", "Auditoría": "Auditoria_CL" },
-      "allowedValues": { "Auditoria_CL": ["PRESUPUESTO_EXCEL", "MANUAL", "AJUSTE"] }
-    },
-    {
-      "id": "PL-06",
-      "name": "Depreciaciones y Amortizaciones",
-      "model": { "name": "Modelo Gastos Ciudad Limpia" },
-      "sheet": "PL-06",
-      "layout": "wide",
-      "measure": "Importe",
-      "columns": { "Sociedad_CL": "Sociedad_CL", "Cecos_CL": "Cecos_CL", "Cebes_CL": "Cebes_CL", "Cuentas_Egresos_CL": "Cuentas_Egresos_CL" },
-      "contextFields": { "Versión": "Version", "Moneda": "Moneda_CL", "Auditoría": "Auditoria_CL" },
-      "allowedValues": { "Auditoria_CL": ["PRESUPUESTO_EXCEL", "MANUAL", "AJUSTE"] }
-    },
-    {
-      "id": "PL-07",
-      "name": "EEFF — Balance cuentas propias",
-      "model": { "name": "Modelo EEFF Ciudad Limpia" },
-      "sheet": "PL-07",
-      "layout": "wide",
-      "measure": "Importe",
-      "columns": { "Sociedad_CL": "Sociedad_CL", "Cuentas_EF_CL": "Cuentas_EF_CL", "Cebes_CL": "Cebes_CL" },
-      "fixedValues": { "Cecos_CL": "#" },
-      "contextFields": { "Versión": "Version", "Moneda": "Moneda_CL", "Auditoría": "Auditoria_CL" },
-      "allowedValues": { "Auditoria_CL": ["MANUAL", "AJUSTE"] }
-    },
-    {
-      "id": "PL-08",
-      "name": "EEFF — Flujo de Caja / CAPEX",
-      "model": { "name": "Modelo EEFF Ciudad Limpia" },
-      "sheet": "PL-08",
-      "layout": "wide",
-      "measure": "Importe",
-      "columns": { "Sociedad_CL": "Sociedad_CL", "Cuentas_EF_CL": "Cuentas_EF_CL", "Cebes_CL": "Cebes_CL" },
-      "fixedValues": { "Cecos_CL": "#" },
-      "contextFields": { "Versión": "Version", "Moneda": "Moneda_CL", "Auditoría": "Auditoria_CL" },
-      "allowedValues": { "Auditoria_CL": ["MANUAL", "AJUSTE"] }
-    },
-    {
-      "id": "GENERICO",
-      "name": "Genérico — encabezados = columnas del modelo",
-      "description": "Para cualquier modelo: los encabezados del archivo deben llamarse igual que las dimensiones del modelo. Formato largo (columnas Date e Importe) o ancho (un periodo por columna).",
+      "id": "OTRO",
+      "name": "Otro modelo (elegir de la lista)",
+      "description": "Cualquier modelo al que tenga acceso. Los encabezados del archivo deben llamarse igual que las dimensiones del modelo.",
       "model": { "selectable": true },
-      "layout": "auto",
-      "columns": "byName",
-      "contextFields": { "Versión": "Version" }
+      "measure": null
     }
   ]
 }

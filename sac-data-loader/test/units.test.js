@@ -110,80 +110,91 @@ function run(modelId, templateId, lines, { version = 'public.Plan', members = tr
   return validate({ grid, template, meta, members: m, options: { version, blockedVersions: ['public.Actual'] } });
 }
 const codes = (r) => r.issues.map((i) => i.code);
-const HDR = ['Sociedad_CL', 'Cecos_CL', 'Cebes_CL', 'Cuentas_Egresos_CL', 'Ene 2026', 'Feb 2026'];
-const CTX = [['Moneda:', 'COP'], ['Auditoría:', 'PRESUPUESTO_EXCEL']];
+const HDR = ['Sociedad_CL', 'Cecos_CL', 'Cebes_CL', 'Cuentas_Egresos_CL', 'Auditoria_CL', 'Moneda_CL', 'Ene 2026', 'Feb 2026'];
+const ROW = ['CL_BOG', 'CECO_ADMIN', 'RECOLECCION', '5105_SALARIOS', 'PRESUPUESTO_EXCEL', 'COP'];
 
-test('validador: archivo correcto genera registros con constantes y versión', () => {
-  const r = run('CL_GASTOS', 'PL-03', [...CTX, HDR, ['CL_BOG', 'CECO_ADMIN', 'RECOLECCION', '5105_SALARIOS', '1.000,5', null]]);
+test('validador: archivo correcto con las dimensiones reales del modelo', () => {
+  const r = run('CL_GASTOS', 'CL_GASTOS', [HDR, [...ROW, '1.000,5', null]]);
   assert.equal(r.ok, true, JSON.stringify(r.issues));
   assert.equal(r.records.length, 1);
   assert.deepEqual(r.records[0], {
-    Moneda_CL: 'COP', Auditoria_CL: 'PRESUPUESTO_EXCEL', Version: 'public.Plan', Sociedad_CL: 'CL_BOG',
-    Cecos_CL: 'CECO_ADMIN', Cebes_CL: 'RECOLECCION', Cuentas_Egresos_CL: '5105_SALARIOS', Date: '202601', Importe: 1000.5,
+    Version: 'public.Plan', Sociedad_CL: 'CL_BOG', Cecos_CL: 'CECO_ADMIN', Cebes_CL: 'RECOLECCION',
+    Cuentas_Egresos_CL: '5105_SALARIOS', Auditoria_CL: 'PRESUPUESTO_EXCEL', Moneda_CL: 'COP', Date: '202601', Importe: 1000.5,
   });
   assert.equal(r.summary.skippedBlank, 1);
   assert.equal(r.summary.totalsByPeriod['202601'], 1000.5);
 });
 
 test('validador: errores de estructura detienen la validación', () => {
-  assert.ok(codes(run('CL_GASTOS', 'PL-03', [['x', 'y'], ['1', '2']])).includes('ENC_NO_ENCONTRADO'));
-  assert.ok(codes(run('CL_GASTOS', 'PL-03', [HDR, ['CL_BOG', 'CECO_ADMIN', 'RECOLECCION', '5105_SALARIOS', 1, 2]])).includes('COL_FALTANTE')); // sin Moneda/Auditoría
-  assert.ok(codes(run('CL_GASTOS', 'PL-03', [...CTX, [...HDR, 'Responsable'], ['CL_BOG', 'CECO_ADMIN', 'RECOLECCION', '5105_SALARIOS', 1, 2, 'x']])).includes('COL_DESCONOCIDA'));
-  assert.ok(codes(run('CL_GASTOS', 'PL-03', [...CTX, [...HDR, 'Ene 2026'], ['CL_BOG', 'CECO_ADMIN', 'RECOLECCION', '5105_SALARIOS', 1, 2, 3]])).includes('PER_DUPLICADO'));
-  assert.ok(codes(run('CL_GASTOS', 'PL-03', [...CTX, [...HDR, null], ['CL_BOG', 'CECO_ADMIN', 'RECOLECCION', '5105_SALARIOS', 1, 2, 3]])).includes('ENC_VACIO'));
-  assert.ok(codes(run('CL_GASTOS', 'PL-03', [...CTX, ['Sociedad_CL', 'Cecos_CL', 'Cebes_CL', 'Cuentas_Egresos_CL'], ['CL_BOG', 'CECO_ADMIN', 'RECOLECCION', '5105_SALARIOS']])).includes('PER_SIN_COLUMNAS'));
+  assert.ok(codes(run('CL_GASTOS', 'CL_GASTOS', [['x', 'y'], ['1', '2']])).includes('ENC_NO_ENCONTRADO'));
+  const sinMoneda = run('CL_GASTOS', 'CL_GASTOS', [HDR.filter((h) => h !== 'Moneda_CL'), [...ROW.slice(0, 5), 1, 2]]);
+  assert.ok(sinMoneda.issues.some((i) => i.code === 'COL_FALTANTE' && i.column === 'Moneda_CL'));
+  assert.ok(codes(run('CL_GASTOS', 'CL_GASTOS', [[...HDR, 'Responsable'], [...ROW, 1, 2, 'x']])).includes('COL_DESCONOCIDA'));
+  assert.ok(codes(run('CL_GASTOS', 'CL_GASTOS', [[...HDR, 'Enr 2026'], [...ROW, 1, 2, 3]])).includes('COL_DESCONOCIDA')); // mes mal escrito
+  assert.ok(codes(run('CL_GASTOS', 'CL_GASTOS', [[...HDR, 'Ene 2026'], [...ROW, 1, 2, 3]])).includes('PER_DUPLICADO'));
+  assert.ok(codes(run('CL_GASTOS', 'CL_GASTOS', [[...HDR, null], [...ROW, 1, 2, 3]])).includes('ENC_VACIO'));
+  assert.ok(codes(run('CL_GASTOS', 'CL_GASTOS', [HDR.slice(0, 6), ROW])).includes('PER_SIN_COLUMNAS'));
+  const ign = run('CL_GASTOS', 'CL_GASTOS', [[...HDR, 'Total', 'Observaciones'], [...ROW, 1, 2, 3, 'nota']]);
+  assert.equal(ign.ok, true);
+  assert.deepEqual(codes(ign), ['COL_IGNORADA', 'COL_IGNORADA']);
 });
 
 test('validador: versión obligatoria, bloqueada, distinta o inexistente', () => {
-  const rows = [...CTX, HDR, ['CL_BOG', 'CECO_ADMIN', 'RECOLECCION', '5105_SALARIOS', 1, 2]];
-  assert.ok(codes(run('CL_GASTOS', 'PL-03', rows, { version: '' })).includes('VERSION_REQUERIDA'));
-  assert.ok(codes(run('CL_GASTOS', 'PL-03', rows, { version: 'public.Actual' })).includes('VERSION_BLOQUEADA'));
-  assert.ok(codes(run('CL_GASTOS', 'PL-03', rows, { version: 'public.Inventada' })).includes('VERSION_INEXISTENTE'));
-  assert.ok(codes(run('CL_GASTOS', 'PL-03', [['Versión:', 'Forecast'], ...rows])).includes('VERSION_DIFERENTE'));
-  assert.equal(run('CL_GASTOS', 'PL-03', [['Versión:', 'Plan'], ...rows]).ok, true);
+  const rows = [HDR, [...ROW, 1, 2]];
+  assert.ok(codes(run('CL_GASTOS', 'CL_GASTOS', rows, { version: '' })).includes('VERSION_REQUERIDA'));
+  assert.ok(codes(run('CL_GASTOS', 'CL_GASTOS', rows, { version: 'public.Actual' })).includes('VERSION_BLOQUEADA'));
+  assert.ok(codes(run('CL_GASTOS', 'CL_GASTOS', rows, { version: 'public.Inventada' })).includes('VERSION_INEXISTENTE'));
+  assert.ok(codes(run('CL_GASTOS', 'CL_GASTOS', [['Versión:', 'Forecast'], ...rows])).includes('VERSION_DIFERENTE'));
+  assert.equal(run('CL_GASTOS', 'CL_GASTOS', [['Versión:', 'Plan'], ...rows]).ok, true);
+  // Columna Version en el archivo: debe coincidir con la seleccionada
+  const conVersion = run('CL_GASTOS', 'CL_GASTOS', [['Version', ...HDR], ['public.Forecast', ...ROW, 1, 2]]);
+  assert.ok(codes(conVersion).includes('VERSION_DIFERENTE'));
 });
 
-test('validador: errores por fila (miembros, vacíos, números, duplicados, permitidos)', () => {
-  const r = run('CL_GASTOS', 'PL-03', [...CTX, HDR,
-    ['CL_BOG', 'CECO_ADMIN', 'RECOLECCION', '5105_SALARIOS', 1, 2],
-    ['cl_bog', 'CECO_ADMIN', 'RECOLECCION', '5105_SALARIOS', 1, 2],
-    ['CL_BOG', '', 'RECOLECCION', '5105_SALARIOS', 1, 2],
-    ['CL_BOG', 'CECO_OPER', 'RECOLECCION', '5105_SALARIOS', 'diez', { excelError: '#REF!' }],
-    ['CL_BOG', 'CECO_ADMIN', 'RECOLECCION', '5105_SALARIOS', 5, 6],
-    ['CL_BOG', 'CECO_ADMIN', 'RECOLECCION', 'X'.repeat(50), 1, 2],
-    ['CL_BOG', 'CECO_ADMIN', 'RECOLECCION', 'a\tb', 1, 2],
+test('validador: errores por fila (miembros, vacíos, números, duplicados, longitud)', () => {
+  const r = run('CL_GASTOS', 'CL_GASTOS', [HDR,
+    [...ROW, 1, 2],
+    ['cl_bog', ...ROW.slice(1), 1, 2],
+    ['CL_BOG', '', ...ROW.slice(2), 1, 2],
+    ['CL_BOG', 'CECO_OPER', ...ROW.slice(2), 'diez', { excelError: '#REF!' }],
+    [...ROW, 5, 6],
+    ['CL_BOG', 'CECO_ADMIN', 'RECOLECCION', 'X'.repeat(50), 'PRESUPUESTO_EXCEL', 'COP', 1, 2],
+    ['CL_BOG', 'CECO_ADMIN', 'RECOLECCION', 'a\tb', 'PRESUPUESTO_EXCEL', 'COP', 1, 2],
   ]);
   const c = codes(r);
   for (const k of ['MIEMBRO_INEXISTENTE', 'VAL_OBLIGATORIO', 'NUM_INVALIDO', 'CLAVE_DUPLICADA', 'VAL_LONGITUD', 'VAL_CARACTERES']) assert.ok(c.includes(k), `falta ${k}: ${c}`);
   assert.match(r.issues.find((i) => i.code === 'MIEMBRO_INEXISTENTE').message, /¿Quiso decir "CL_BOG"\?/);
   assert.equal(r.ok, false);
-
-  const bad = run('CL_GASTOS', 'PL-03', [['Moneda:', 'COP'], ['Auditoría:', 'OTRA'], HDR, ['CL_BOG', 'CECO_ADMIN', 'RECOLECCION', '5105_SALARIOS', 1, 2]]);
-  assert.ok(codes(bad).includes('VAL_NO_PERMITIDO'));
 });
 
-test('validador: PL-02 no admite negativos e ignora Tipo_Residuo con aviso', () => {
-  const r = run('CL_INGRESOS', 'PL-02', [
-    ['Moneda:', 'COP'], ['Auditoría:', 'PXQ'],
-    ['Sociedad_CL', 'Cebes_CL', 'Cliente', 'Tipo_Residuo', 'Ratio_CL', 'Ene 2026'],
-    ['CL_BOG', 'RECOLECCION', 'CLI_001', 'Ordinario', 'TARIFA', -5],
-  ]);
-  const c = codes(r);
-  assert.ok(c.includes('NUM_NEGATIVO'));
-  assert.ok(c.includes('COL_IGNORADA'));
+test('validador: Ingreso usa "#" para Cliente/Regional si no vienen, y el archivo manda si vienen', () => {
+  const H = ['Sociedad_CL', 'Cebes_CL', 'Ratio_CL', 'Auditoria_CL', 'Moneda_CL', 'Ene 2026'];
+  const sin = run('CL_INGRESOS', 'CL_INGRESO', [H, ['CL_BOG', 'RECOLECCION', 'TARIFA', 'PXQ', 'COP', 10]]);
+  assert.equal(sin.ok, true, JSON.stringify(sin.issues));
+  assert.equal(sin.records[0].Cliente, '#');
+  assert.equal(sin.records[0].Regional, '#');
+  const con = run('CL_INGRESOS', 'CL_INGRESO', [[...H, 'Cliente'], ['CL_BOG', 'RECOLECCION', 'TARIFA', 'PXQ', 'COP', 10, 'CLI_002']]);
+  assert.equal(con.ok, true, JSON.stringify(con.issues));
+  assert.equal(con.records[0].Cliente, 'CLI_002');
+  assert.equal(con.records[0].Regional, '#');
+  const neg = run('CL_INGRESOS', 'CL_INGRESO', [H, ['CL_BOG', 'RECOLECCION', 'TARIFA', 'PXQ', 'COP', -5]], { templateOverride: { rules: { allowNegative: false } } });
+  assert.ok(codes(neg).includes('NUM_NEGATIVO'));
 });
 
-test('validador: formato largo (GENERICO) y periodo inválido', () => {
-  const H = ['Sociedad_CL', 'Cecos_CL', 'Cebes_CL', 'Cuentas_Egresos_CL', 'Moneda_CL', 'Auditoria_CL', 'Date', 'Importe'];
-  const ok = run('CL_GASTOS', 'GENERICO', [H, ['CL_BOG', 'CECO_ADMIN', 'RECOLECCION', '5105_SALARIOS', 'COP', 'MANUAL', 'Mar 2026', '10']]);
+test('validador: formato largo (Date + Importe) y periodo inválido', () => {
+  const H = [...HDR.slice(0, 6), 'Date', 'Importe'];
+  const ok = run('CL_GASTOS', 'CL_GASTOS', [H, [...ROW, 'Mar 2026', '10']]);
   assert.equal(ok.ok, true, JSON.stringify(ok.issues));
   assert.equal(ok.summary.layout, 'long');
   assert.equal(ok.records[0].Date, '202603');
-  const bad = run('CL_GASTOS', 'GENERICO', [H, ['CL_BOG', 'CECO_ADMIN', 'RECOLECCION', '5105_SALARIOS', 'COP', 'MANUAL', '2026-13', '10']]);
+  const bad = run('CL_GASTOS', 'CL_GASTOS', [H, [...ROW, '2026-13', '10']]);
   assert.ok(codes(bad).includes('PER_INVALIDO'));
 });
 
 test('validador: archivo sin valores y miembro "#" (sin asignar)', () => {
-  const r = run('CL_GASTOS', 'PL-03', [...CTX, HDR, ['CL_BOG', '#', 'RECOLECCION', '5105_SALARIOS', null, '']]);
+  const r = run('CL_EEFF', 'CL_EEFF', [
+    ['Sociedad_CL', 'Cuentas_EF_CL', 'Cebes_CL', 'Cecos_CL', 'Auditoria_CL', 'Moneda_CL', 'Ene 2026'],
+    ['CL_BOG', '1105_CAJA', 'CORPORATIVO', '#', 'MANUAL', 'COP', null],
+  ]);
   assert.deepEqual(codes(r), ['SIN_REGISTROS']);
 });

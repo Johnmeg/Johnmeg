@@ -24,7 +24,7 @@ Navegador ──► App (Node.js) ──► SAC Data Import / Export API
 
 | Paso | Qué ve el usuario |
 |---|---|
-| 1. Archivo | Plantilla (PL-01…PL-08 o Genérico), modelo, versión (lista leída de SAC; `public.Actual` bloqueada), método de carga y archivo |
+| 1. Archivo | Modelo (Gastos, Ingreso, EEFF u otro), versión (lista leída de SAC; `public.Actual` bloqueada), método de carga y archivo. La pantalla muestra las columnas que debe traer el archivo |
 | 2. Validación local | Resumen, hallazgos (errores y advertencias con fila, columna y valor), totales por periodo, vista previa y reporte CSV descargable |
 | 3. Validación en SAC | Resultado de SAC. Con *Borrar y reemplazar*, cuántos registros se borrarán; se exige confirmarlo |
 | 4. Carga | Estado del job y número de registros escritos |
@@ -36,14 +36,14 @@ Navegador ──► App (Node.js) ──► SAC Data Import / Export API
 **Del archivo**
 - Extensión permitida (.xlsx, .xlsm, .csv, .txt) y contenido real del archivo (un Excel renombrado se detecta). Tamaño y número de filas máximos.
 - Codificación (UTF-8, UTF-8 con BOM, UTF-16, Windows-1252) y separador (`;` `,` tabulador `|`) detectados automáticamente. Comillas sin cerrar.
-- Hoja esperada de la plantilla. Si el libro tiene una sola hoja con datos, se usa esa hoja y se muestra una advertencia.
+- En Excel se lee la primera hoja visible con datos.
 
 **De la estructura**
-- Fila de encabezados encontrada automáticamente (el bloque de contexto de la plantilla puede ir arriba).
-- Columnas obligatorias: todas las dimensiones clave del modelo deben venir en el archivo, en el bloque de contexto o como valor fijo de la plantilla.
+- Fila de encabezados encontrada automáticamente (puede haber títulos o una fila `Versión:` arriba).
+- Columnas obligatorias: todas las dimensiones del modelo deben venir en el archivo, salvo las que tienen valor por defecto.
 - Columnas desconocidas (error), columnas ignoradas como *Total* u *Observaciones* (advertencia), encabezados duplicados, columnas con datos sin encabezado.
 - Periodos: `Ene 2026`, `ene-26`, `Enero 2026`, `Jan 2026`, `202601`, `2026-01`, `01/2026` o fechas de Excel. Periodos inválidos, repetidos o fuera de rango.
-- La plantilla apunta a columnas que existen en el modelo (se lee la metadata real del modelo en SAC).
+- Las columnas se comparan con la metadata real del modelo en SAC.
 
 **De la versión**
 - Obligatoria (sin versión, SAC cargaría en `public.Actual`).
@@ -53,7 +53,7 @@ Navegador ──► App (Node.js) ──► SAC Data Import / Export API
 
 **De cada fila**
 - Dimensiones vacías, fechas en lugar de códigos, caracteres de control, espacios de más (se eliminan y se avisa), longitud máxima de la columna.
-- Valores permitidos por plantilla (p. ej. `Auditoria_CL`).
+- Valores permitidos, si se configuran.
 - **Miembros existentes** en el maestro de cada dimensión. SAC distingue mayúsculas, y se sugiere el código correcto (`"cl_bog"`: ¿Quiso decir `"CL_BOG"`?). El miembro `#` (sin asignar) siempre se acepta.
 - Números en formato colombiano (`1.234.567,89`) o inglés, negativos contables `(1.500)` o `1500-`, errores de Excel (`#N/A`, `#REF!`), texto en lugar de número, formato ambiguo (`1.234`), negativos no permitidos, decimales y valores inusualmente grandes.
 - **Combinaciones repetidas**: SAC se quedaría sólo con el último valor.
@@ -74,7 +74,7 @@ Navegador ──► App (Node.js) ──► SAC Data Import / Export API
    - **Redirect URI:** `<APP_BASE_URL>/auth/callback`, p. ej. `https://cargas.fanalca.com/auth/callback`
    - Copie **Client ID** y **Secret**. En la misma pantalla copie **Authorization URL** y **Token URL**.
 2. **Permisos de los usuarios**: el usuario necesita en SAC permisos de planificación sobre el modelo (leer y mantener/importar datos), además de acceso de escritura a la versión y a los miembros según el Data Access Control. La aplicación no amplía ningún permiso: si SAC niega la operación, se informa al usuario.
-3. **Nombres de modelos y columnas**: en `config/templates.json` cada plantilla indica el modelo por nombre (`model.name`) o, mejor, por ID (`model.id`). También indica el mapeo de encabezados a dimensiones. Revíselos contra los modelos reales. La app valida la metadata al cargar y avisa si una columna no existe.
+3. **Modelos**: `config/templates.json` ya trae los tres modelos de Ciudad Limpia con su ID y su nombre. Si se crea otro modelo, agréguelo ahí o use *Otro modelo*.
 
 ---
 
@@ -98,7 +98,7 @@ npm run demo
 Levanta un **SAC simulado** (login OAuth, Data Import y Data Export API) y la aplicación en `http://localhost:3000`.
 
 - Usuarios de prueba: `ana` / `demo` (puede cargar) y `luis` / `demo` (sin permiso de escritura).
-- Hay archivos de ejemplo en `samples/`: válidos y con errores a propósito. Se regeneran con `node scripts/make-samples.js`.
+- Hay archivos de ejemplo en `samples/` para Gastos, Ingreso y EEFF: válidos y con errores a propósito. Se regeneran con `node scripts/make-samples.js`. Los códigos de miembros son los del simulador; en SAC real use sus códigos.
 
 ### Pruebas
 
@@ -113,26 +113,37 @@ npm test
 
 ---
 
-## 5. Plantillas (`config/templates.json`)
+## 5. Modelos configurados (`config/templates.json`)
+
+No se necesitan plantillas especiales: el archivo trae como **encabezados los nombres reales de las dimensiones** del modelo. Los periodos pueden venir de dos formas:
+- **Meses como columnas**, por ejemplo `Ene 2026`, `Feb 2026` o `202601`.
+- **Una columna `Date` y otra `Importe`**, con un registro por fila.
+
+La versión se elige en pantalla. Si el archivo trae una columna `Version`, debe coincidir con la seleccionada.
+
+| Carga a | Modelo en SAC | Columnas del archivo |
+|---|---|---|
+| Gastos Ciudad Limpia | Modelo Gastos Ciudad Limpia | `Sociedad_CL`, `Cecos_CL`, `Cebes_CL`, `Cuentas_Egresos_CL`, `Auditoria_CL`, `Moneda_CL` + periodos |
+| Ingreso Ciudad Limpia | Modelo Ingreso Ciudad Limpia | `Sociedad_CL`, `Cebes_CL`, `Ratio_CL`, `Auditoria_CL`, `Moneda_CL` + periodos. `Cliente` y `Regional` son opcionales: si no vienen, se carga `#`. Permite *Borrar y reemplazar* |
+| EEFF Ciudad Limpia | Modelo EEFF Ciudad Limpia | `Sociedad_CL`, `Cuentas_EF_CL`, `Cebes_CL`, `Cecos_CL`, `Auditoria_CL`, `Moneda_CL` + periodos |
+| Otro modelo | Se elige de la lista de modelos del usuario | Las dimensiones de ese modelo + periodos |
+
+El modelo se busca por su **ID**, tomado de la URL del Modeler, y si ese ID no aparece, por su **nombre**. Las columnas `Total`, `Observaciones` y `Comentarios` se ignoran con una advertencia. Cualquier otra columna desconocida es un error, porque puede ser un mes o una dimensión mal escrita.
+
+Campos disponibles por modelo:
 
 | Campo | Uso |
 |---|---|
-| `model` | `{ "id": "..." }` o `{ "name": "..." }`; `{ "selectable": true }` permite elegir el modelo (plantilla GENERICO) |
-| `sheet` | Hoja del libro Excel |
-| `layout` | `wide` (un periodo por columna), `long` (columnas `Date` e `Importe`) o `auto` |
-| `columns` | Encabezado del archivo → columna del modelo. El texto entre paréntesis del encabezado se ignora: `Cebes_CL (componente)`. `"byName"` = los encabezados se llaman igual que las columnas del modelo |
-| `fixedValues` | Valor para todas las filas, p. ej. `"Cliente": "#"` |
-| `contextFields` | Etiquetas del bloque superior (`Versión:`, `Moneda:`, `Auditoría:`) → columna del modelo |
-| `allowedValues` | Lista de valores permitidos por columna |
-| `ignoreColumns` | Columnas que se leen pero no se cargan (advertencia) |
+| `model` | `{ "id": "...", "name": "..." }`; `{ "selectable": true }` permite elegir el modelo |
+| `columns` | `"byName"` (encabezado = dimensión) o un mapeo `{ "Encabezado del archivo": "Dimensión" }` |
+| `defaultValues` | Valor que se usa si la columna no viene en el archivo, p. ej. `"Cliente": "#"` |
+| `fixedValues` | Valor que se aplica siempre |
 | `importMethods` | `Update` (reemplaza el valor de la celda), `CleanAndReplace` (borra primero el alcance) o `Append` (suma) |
 | `cleanAndReplaceScope` | Dimensiones que definen qué se borra con `CleanAndReplace` |
+| `allowedValues` | Lista de valores permitidos por columna |
 | `rules` | `allowNegative`, `skipZeroValues`, `maxDecimals` |
 | `periodRange` | `{ "from": "202601", "to": "202612" }` |
-| `measure`, `versionColumn`, `dateColumn` | Sólo si no se pueden deducir de la metadata del modelo |
-| `reverseSignByAccountType` | Invierte el signo según el tipo de cuenta (opción del Data Import API) |
-
----
+| `layout` | `auto` (por defecto), `wide` o `long` |
 
 ## 6. Seguridad
 
@@ -154,10 +165,10 @@ npm test
 ## 7. Limitaciones conocidas
 
 - `.xls` (Excel 97-2003) no se soporta: guarde el archivo como `.xlsx`.
-- Se carga **una medida** por plantilla (`Importe`).
+- Se carga **una medida** por modelo (`Importe`).
 - `privateFactData` (versiones privadas) sólo aplica a usuarios de negocio. Se usa automáticamente cuando la versión empieza por `private.`.
 - Si SAC no expone el maestro de una dimensión por el Data Export API, se avisa y esos códigos los valida SAC en el paso 3.
-- **PL-02:** el modelo de ingresos no tiene la dimensión de tipo de residuo, así que la columna `Tipo_Residuo` se ignora con advertencia. Agregue la dimensión al modelo si se requiere.
+- La dimensión **Version** de Gastos y EEFF tiene un solo miembro. Si es `public.Actual`, que está bloqueada por defecto, cree una versión de plan o forecast en SAC o ajuste `BLOCKED_VERSIONS`.
 - SAC guarda los jobs 15 días y permite hasta 100 jobs activos por usuario y modelo. La app elimina los jobs cancelados o rechazados.
 
 ---
@@ -177,7 +188,7 @@ src/periods.js          periodos → YYYYMM
 src/meta.js             metadata del modelo
 src/config.js, audit.js configuración y auditoría
 public/                 interfaz (HTML/CSS/JS sin dependencias)
-config/templates.json   catálogo de plantillas PL-01…PL-08 y GENERICO
+config/templates.json   modelos de Ciudad Limpia (Gastos, Ingreso, EEFF) y otro modelo
 test/                   pruebas y SAC simulado
 samples/                archivos de ejemplo
 ```

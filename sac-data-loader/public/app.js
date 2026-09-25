@@ -103,7 +103,7 @@
     sel.replaceChildren(el('option', 'Seleccione…'));
     sel.firstChild.value = '';
     for (const t of templates) {
-      const o = el('option', `${t.id} — ${t.name}`); o.value = t.id; sel.append(o);
+      const o = el('option', t.name); o.value = t.id; sel.append(o);
     }
   }
 
@@ -169,6 +169,7 @@
     $('versionSel').hidden = false; $('versionInput').hidden = true;
     $('versionSel').replaceChildren(el('option', state.template ? 'Cargando versiones…' : '—'));
     $('versionHint').textContent = '';
+    $('columnsHint').textContent = '';
   }
 
   async function loadVersions() {
@@ -178,6 +179,10 @@
     try {
       const data = await api(`/api/versions?${q}`);
       if (!t.selectableModel) $('modelName').textContent = `${data.model.name} (${data.model.id})`;
+      const cols = (data.expectedColumns || []).map((c) => (c.optional ? `${c.name} (opcional)` : c.name));
+      $('columnsHint').textContent = cols.length
+        ? `El archivo debe traer las columnas ${cols.join(', ')} y los meses (p. ej. Ene 2026) o las columnas ${data.dateColumn} e ${data.measure}.`
+        : '';
       state.versions = data.versions;
       if (!data.versions) {
         // SAC no expone el maestro de versiones: se escribe a mano (SAC lo valida)
@@ -219,7 +224,7 @@
   $('uploadForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const t = state.template;
-    if (!t) return toast('Seleccione una plantilla.');
+    if (!t) return toast('Seleccione el modelo al que va a cargar.');
     if (t.selectableModel && !$('modelSel').value) return toast('Seleccione el modelo de destino.');
     const version = selectedVersion();
     if (!version) return toast('Seleccione la versión de destino.');

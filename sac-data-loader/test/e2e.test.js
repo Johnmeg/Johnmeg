@@ -125,18 +125,20 @@ test('flujo completo: login, validar, validar en SAC, cargar', async (t) => {
   assert.equal(me.body.user.name, 'Ana Planeación');
 
   const tpl = await json('GET', '/api/templates');
-  assert.ok(tpl.body.templates.some((x) => x.id === 'PL-01'));
+  assert.ok(tpl.body.templates.some((x) => x.id === 'CL_INGRESO'));
 
-  const vers = await json('GET', '/api/versions?template=PL-01');
-  assert.equal(vers.body.model.id, 'CL_INGRESOS');
+  const vers = await json('GET', '/api/versions?template=CL_INGRESO');
+  assert.equal(vers.body.model.id, 'CL_INGRESOS'); // el ID configurado no existe en el simulador: se encontró por nombre
+  assert.deepEqual(vers.body.expectedColumns.filter((c) => c.optional).map((c) => c.name).sort(), ['Cliente', 'Regional']);
+  assert.ok(vers.body.expectedColumns.some((c) => c.name === 'Ratio_CL' && !c.optional));
   assert.deepEqual(vers.body.versions.find((v) => v.id === 'public.Actual'), { id: 'public.Actual', blocked: true });
 
   // Sin cabecera anti-CSRF: rechazado
   const { go } = await login(stack);
-  const noHeader = await go(`${stack.appUrl}/api/validate`, { method: 'POST', body: fileForm({ template: 'PL-01', version: 'public.Plan' }, 'PL-01_ingresos_valido.xlsx') });
+  const noHeader = await go(`${stack.appUrl}/api/validate`, { method: 'POST', body: fileForm({ template: 'CL_INGRESO', version: 'public.Plan' }, 'Ingreso_CL_valido.xlsx') });
   assert.equal(noHeader.status, 403);
 
-  const v = await json('POST', '/api/validate', fileForm({ template: 'PL-01', version: 'public.Plan', importMethod: 'Update' }, 'PL-01_ingresos_valido.xlsx'));
+  const v = await json('POST', '/api/validate', fileForm({ template: 'CL_INGRESO', version: 'public.Plan', importMethod: 'Update' }, 'Ingreso_CL_valido.xlsx'));
   assert.equal(v.status, 200, JSON.stringify(v.body));
   assert.equal(v.body.ok, true, JSON.stringify(v.body.issues));
   assert.equal(v.body.summary.records, 48);
@@ -176,7 +178,7 @@ test('archivo con errores: no se envía nada a SAC', async (t) => {
   const stack = await startStack();
   t.after(() => stack.close());
   const { json } = await login(stack);
-  const v = await json('POST', '/api/validate', fileForm({ template: 'PL-01', version: 'public.Plan' }, 'PL-01_ingresos_con_errores.xlsx'));
+  const v = await json('POST', '/api/validate', fileForm({ template: 'CL_INGRESO', version: 'public.Plan' }, 'Ingreso_CL_con_errores.xlsx'));
   assert.equal(v.body.ok, false);
   const c = v.body.issues.map((i) => i.code);
   for (const k of ['MIEMBRO_INEXISTENTE', 'VAL_OBLIGATORIO', 'NUM_INVALIDO', 'CLAVE_DUPLICADA']) assert.ok(c.includes(k), k);
@@ -184,16 +186,16 @@ test('archivo con errores: no se envía nada a SAC', async (t) => {
   assert.equal(p.status, 409);
   assert.equal(stack.mock.jobs.size, 0);
 
-  const blocked = await json('POST', '/api/validate', fileForm({ template: 'PL-03', version: 'public.Actual' }, 'PL-03_gastos_valido.csv'));
+  const blocked = await json('POST', '/api/validate', fileForm({ template: 'CL_GASTOS', version: 'public.Actual' }, 'Gastos_CL_valido.xlsx'));
   assert.ok(blocked.body.issues.some((i) => i.code === 'VERSION_BLOQUEADA'));
 
-  const method = await json('POST', '/api/validate', fileForm({ template: 'PL-03', version: 'public.Plan', importMethod: 'CleanAndReplace' }, 'PL-03_gastos_valido.csv'));
+  const method = await json('POST', '/api/validate', fileForm({ template: 'CL_GASTOS', version: 'public.Plan', importMethod: 'CleanAndReplace' }, 'Gastos_CL_valido.xlsx'));
   assert.equal(method.status, 400);
 
-  const ext = await json('POST', '/api/validate', (() => { const f = new FormData(); f.append('template', 'PL-03'); f.append('version', 'public.Plan'); f.append('file', new Blob(['x']), 'datos.exe'); return f; })());
+  const ext = await json('POST', '/api/validate', (() => { const f = new FormData(); f.append('template', 'CL_GASTOS'); f.append('version', 'public.Plan'); f.append('file', new Blob(['x']), 'datos.exe'); return f; })());
   assert.equal(ext.status, 422);
 
-  const big = await json('POST', '/api/validate', (() => { const f = new FormData(); f.append('template', 'PL-03'); f.append('version', 'public.Plan'); f.append('file', new Blob([Buffer.alloc(2 * 1024 * 1024, 65)]), 'grande.csv'); return f; })());
+  const big = await json('POST', '/api/validate', (() => { const f = new FormData(); f.append('template', 'CL_GASTOS'); f.append('version', 'public.Plan'); f.append('file', new Blob([Buffer.alloc(2 * 1024 * 1024, 65)]), 'grande.csv'); return f; })());
   assert.equal(big.status, 413);
 });
 
@@ -202,7 +204,7 @@ test('CleanAndReplace exige confirmación e informa lo que se borra', async (t) 
   t.after(() => stack.close());
   const { json } = await login(stack);
   const load = async (importMethod) => {
-    const v = await json('POST', '/api/validate', fileForm({ template: 'PL-01', version: 'public.Plan', importMethod }, 'PL-01_ingresos_valido.xlsx'));
+    const v = await json('POST', '/api/validate', fileForm({ template: 'CL_INGRESO', version: 'public.Plan', importMethod }, 'Ingreso_CL_valido.xlsx'));
     assert.equal(v.body.ok, true);
     const p = await json('POST', '/api/sac/prepare', { uploadId: v.body.uploadId });
     assert.equal(p.body.ok, true);
@@ -233,12 +235,12 @@ test('SAC rechaza filas: se cancela el job completo (sin validación local de mi
   const stack = await startStack({ validateMembers: false });
   t.after(() => stack.close());
   const { json } = await login(stack);
-  const v = await json('POST', '/api/validate', fileForm({ template: 'GENERICO', modelId: 'CL_GASTOS', version: 'public.Plan' }, 'GENERICO_gastos_formato_largo.csv'));
+  const v = await json('POST', '/api/validate', fileForm({ template: 'OTRO', modelId: 'CL_GASTOS', version: 'public.Plan' }, 'Gastos_CL_formato_largo.csv'));
   assert.equal(v.body.ok, true, JSON.stringify(v.body.issues));
   // CL_MED existe; forzar un miembro inválido cambiando el archivo:
-  const bad = fs.readFileSync(path.join(SAMPLES, 'GENERICO_gastos_formato_largo.csv'), 'utf8').replace(/CL_MED/g, 'CL_XXX');
+  const bad = fs.readFileSync(path.join(SAMPLES, 'Gastos_CL_formato_largo.csv'), 'utf8').replace(/CL_MED/g, 'CL_XXX');
   const f = new FormData();
-  f.append('template', 'GENERICO'); f.append('modelId', 'CL_GASTOS'); f.append('version', 'public.Plan');
+  f.append('template', 'OTRO'); f.append('modelId', 'CL_GASTOS'); f.append('version', 'public.Plan');
   f.append('file', new Blob([bad]), 'malo.csv');
   const v2 = await json('POST', '/api/validate', f);
   assert.equal(v2.body.ok, true);
@@ -256,7 +258,7 @@ test('permisos de SAC y renovación de token', async (t) => {
   const stack = await startStack({ tokenTtlSec: 30 }); // expira dentro del margen: se renueva en cada llamada
   t.after(() => stack.close());
   const luis = await login(stack, 'luis');
-  const v = await luis.json('POST', '/api/validate', fileForm({ template: 'PL-03', version: 'public.Plan' }, 'PL-03_gastos_valido.csv'));
+  const v = await luis.json('POST', '/api/validate', fileForm({ template: 'CL_GASTOS', version: 'public.Plan' }, 'Gastos_CL_valido.xlsx'));
   assert.equal(v.body.ok, true, JSON.stringify(v.body.issues));
   const p = await luis.json('POST', '/api/sac/prepare', { uploadId: v.body.uploadId });
   assert.equal(p.status, 502);

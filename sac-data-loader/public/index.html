@@ -48,11 +48,11 @@
 
       <!-- ---------------------------------------------- paso 1 -->
       <section class="card" id="step1">
-        <h2>1. Seleccione la plantilla y el archivo</h2>
+        <h2>1. Seleccione el modelo y el archivo</h2>
         <form id="uploadForm" novalidate>
           <div class="grid">
             <label class="field">
-              <span>Plantilla de carga</span>
+              <span>Carga a</span>
               <select id="templateSel" name="template" required></select>
               <small id="templateDesc" class="hint"></small>
             </label>
@@ -63,8 +63,9 @@
             </label>
 
             <div class="field">
-              <span>Modelo</span>
+              <span>Modelo en SAC</span>
               <div class="readonly" id="modelName">—</div>
+              <small class="hint" id="columnsHint"></small>
             </div>
 
             <label class="field">

@@ -9,13 +9,13 @@ const { toPeriod, stripAccents } = require('./periods');
 // lista de hallazgos. Un solo error (severity "error") bloquea la carga.
 
 const CATALOG = {
-  ENC_NO_ENCONTRADO: 'No se encontró la fila de encabezados de la plantilla',
+  ENC_NO_ENCONTRADO: 'No se encontró la fila de encabezados',
   ENC_DUPLICADO: 'Columna duplicada en el encabezado',
   ENC_VACIO: 'Columna con datos pero sin encabezado',
   COL_FALTANTE: 'Falta una columna/dimensión obligatoria',
-  COL_DESCONOCIDA: 'Columna que no pertenece a la plantilla ni al modelo',
+  COL_DESCONOCIDA: 'Columna que no pertenece al modelo',
   COL_IGNORADA: 'Columna ignorada',
-  COL_NO_EXISTE_EN_MODELO: 'La plantilla apunta a una columna que no existe en el modelo',
+  COL_NO_EXISTE_EN_MODELO: 'La configuración apunta a una columna que no existe en el modelo',
   PER_SIN_COLUMNAS: 'No hay columnas de periodo',
   PER_INVALIDO: 'Periodo inválido',
   PER_DUPLICADO: 'Periodo repetido',
@@ -158,7 +158,7 @@ function validate({ grid, template, meta, members = new Map(), options = {} }) {
     for (const [fileHeader, modelCol] of Object.entries(template.columns)) {
       if (!modelCols.has(modelCol)) {
         issues.error('COL_NO_EXISTE_EN_MODELO',
-          `La plantilla "${template.id}" mapea "${fileHeader}" a "${modelCol}", pero el modelo no tiene esa columna. Columnas del modelo: ${[...modelCols.keys()].join(', ')}.`,
+          `La configuración "${template.id}" mapea "${fileHeader}" a "${modelCol}", pero el modelo no tiene esa columna. Columnas del modelo: ${[...modelCols.keys()].join(', ')}.`,
           { column: modelCol });
         continue;
       }
@@ -205,7 +205,7 @@ function validate({ grid, template, meta, members = new Map(), options = {} }) {
       issues.warn('COL_IGNORADA', `La columna "${label}" no se carga.${note}`, where);
       return;
     }
-    const msg = `La columna "${label}" no pertenece a la plantilla "${template.name}". Revise el nombre o elimínela.`;
+    const msg = `La columna "${label}" no es una dimensión del modelo ni un periodo reconocible. Revise el nombre (debe ser igual al de SAC) o elimínela.`;
     if (template.ignoreUnknownColumns) issues.warn('COL_DESCONOCIDA', msg, where);
     else issues.error('COL_DESCONOCIDA', msg, where);
   });
@@ -221,7 +221,12 @@ function validate({ grid, template, meta, members = new Map(), options = {} }) {
 
   // ---------------------------------------------------------------- layout
   let layout = template.layout || 'auto';
-  if (layout === 'auto') layout = periodCols.length && dateIdx < 0 ? 'wide' : 'long';
+  if (layout === 'auto' && !periodCols.length && dateIdx < 0) {
+    issues.error('PER_SIN_COLUMNAS',
+      `No se encontraron periodos: ponga los meses como columnas (p. ej. "Ene 2026" o "202601") o use las columnas "${dateColumn}" y "${measure}".`,
+      { row: header.n });
+    layout = null;
+  } else if (layout === 'auto') layout = periodCols.length && dateIdx < 0 ? 'wide' : 'long';
   summary.layout = layout;
   if (layout === 'wide' && !periodCols.length) {
     issues.error('PER_SIN_COLUMNAS', 'No se encontraron columnas de periodo (p. ej. "Ene 2026" o "202601") en el encabezado.', { row: header.n });
@@ -233,12 +238,17 @@ function validate({ grid, template, meta, members = new Map(), options = {} }) {
 
   // ---------------------------------------------------------------- valores fijos / contexto / versión
   const constants = {}; // columna del modelo -> valor aplicado a todas las filas
-  for (const [col, value] of Object.entries(template.fixedValues || {})) {
-    if (!modelCols.has(col)) {
-      issues.error('COL_NO_EXISTE_EN_MODELO', `El valor fijo "${col}" de la plantilla no existe en el modelo.`, { column: col });
-      continue;
+  // defaultValues: sólo si la columna no viene en el archivo. fixedValues: siempre.
+  const fileCols = new Set(dimCols.map((d) => d.modelCol));
+  for (const [kind, values] of [['por defecto', template.defaultValues], ['fijo', template.fixedValues]]) {
+    for (const [col, value] of Object.entries(values || {})) {
+      if (!modelCols.has(col)) {
+        issues.error('COL_NO_EXISTE_EN_MODELO', `El valor ${kind} "${col}" de la configuración no existe en el modelo.`, { column: col });
+        continue;
+      }
+      if (kind === 'por defecto' && fileCols.has(col)) continue;
+      constants[col] = { value: String(value), source: `valor ${kind}` };
     }
-    constants[col] = { value: String(value), source: 'plantilla' };
   }
   for (const [col, { value, row }] of Object.entries(context)) {
     if (col === versionColumn) continue;
@@ -272,7 +282,7 @@ function validate({ grid, template, meta, members = new Map(), options = {} }) {
   const provided = new Set([versionColumn, dateColumn, ...Object.keys(constants), ...dimCols.map((d) => d.modelCol)]);
   for (const key of meta.keys) {
     if (!provided.has(key)) {
-      issues.error('COL_FALTANTE', `El modelo exige la dimensión "${key}" y no viene en el archivo ni como valor fijo de la plantilla.`, { row: header.n, column: key });
+      issues.error('COL_FALTANTE', `El modelo exige la dimensión "${key}" y no viene en el archivo. Agregue la columna "${key}".`, { row: header.n, column: key });
     }
   }
   if (issues.errors) return finish(); // no seguir fila a fila con una estructura inválida
@@ -343,7 +353,7 @@ function validate({ grid, template, meta, members = new Map(), options = {} }) {
       if (num.error) { issues.error('NUM_INVALIDO', num.error, v.where); rowOk = false; continue; }
       if (num.ambiguous) { ambiguous.count++; if (!ambiguous.first) ambiguous.first = { ...v.where, parsed: num.value }; }
       else if (typeof v.raw === 'string' && (numberLocale === 'en' ? /\.\d|,.*,/ : /,\d|\..*\./).test(v.raw)) ambiguous.confirmed = true;
-      if (num.value < 0 && !rules.allowNegative) { issues.error('NUM_NEGATIVO', `Esta plantilla no admite valores negativos (${num.value}).`, v.where); rowOk = false; continue; }
+      if (num.value < 0 && !rules.allowNegative) { issues.error('NUM_NEGATIVO', `Este modelo no admite valores negativos (${num.value}).`, v.where); rowOk = false; continue; }
       if (countDecimals(num.value) > rules.maxDecimals) issues.warn('NUM_DECIMALES', `${num.value} tiene más de ${rules.maxDecimals} decimales.`, v.where);
       if (Math.abs(num.value) >= 1e13) issues.warn('NUM_EXCESIVO', `${num.value} es inusualmente grande; verifique unidades (¿miles vs pesos?).`, v.where);
       if (num.value === 0 && rules.skipZeroValues) { summary.skippedBlank++; continue; }

@@ -17,7 +17,7 @@ class SacError extends Error {
 const FRIENDLY = {
   401: 'La sesión con SAP Analytics Cloud expiró. Inicie sesión nuevamente.',
   403: 'Su usuario no tiene permisos en SAC para esta operación o modelo (rol de planificación o Data Access Control).',
-  404: 'SAC no encontró el recurso (modelo o job). Verifique la configuración de la plantilla.',
+  404: 'SAC no encontró el recurso (modelo o job). Verifique la configuración del modelo en config/templates.json.',
 };
 
 class SacClient {

@@ -141,15 +141,17 @@ function createApp(cfg, { audit = () => {}, logger = console } = {}) {
       if (!m) throw new ConfigError('El modelo seleccionado no existe o su usuario no tiene acceso.');
       return m;
     }
-    if (template.model?.id) return { id: template.model.id, name: template.model.name || template.model.id };
     const models = await client.listModels();
+    // Primero por ID; si el ID no existe (p. ej. se copió mal), por nombre.
+    const byId = template.model?.id && models.find((m) => m.id === template.model.id);
+    if (byId) return byId;
     const wanted = norm(template.model?.name);
-    const hits = models.filter((m) => norm(m.name) === wanted);
+    const hits = wanted ? models.filter((m) => norm(m.name) === wanted) : [];
     if (!hits.length) {
-      throw new ConfigError(`No se encontró el modelo "${template.model?.name}" en SAC o su usuario no tiene acceso a él.`);
+      throw new ConfigError(`No se encontró el modelo "${template.model?.name || template.model?.id}" en SAC o su usuario no tiene acceso a él.`);
     }
     if (hits.length > 1) {
-      throw new ConfigError(`Hay ${hits.length} modelos llamados "${template.model?.name}". Configure "model.id" en la plantilla ${template.id}.`);
+      throw new ConfigError(`Hay ${hits.length} modelos llamados "${template.model?.name}". Configure "model.id" en ${template.id}.`);
     }
     return hits[0];
   }
@@ -261,7 +263,12 @@ function createApp(cfg, { audit = () => {}, logger = console } = {}) {
     const set = await membersOf(client, model.id, meta.versionColumn).catch(() => null);
     const blocked = new Set(cfg.blockedVersions.map((v) => norm(v)));
     const versions = set ? [...set].sort().map((id) => ({ id, blocked: blocked.has(norm(id)) })) : null;
-    return res.json({ model, versionColumn: meta.versionColumn, versions });
+    // Columnas que debe traer el archivo (dimensiones del modelo menos versión y fecha)
+    const optional = new Set(Object.keys({ ...(template.defaultValues || {}), ...(template.fixedValues || {}) }));
+    const expectedColumns = meta.keys
+      .filter((k) => k !== meta.versionColumn && k !== meta.dateColumn)
+      .map((k) => ({ name: k, optional: optional.has(k) }));
+    return res.json({ model, versionColumn: meta.versionColumn, dateColumn: meta.dateColumn, measure: meta.measure, expectedColumns, versions });
   }));
 
   // ------------------------------------------------------------ validación local
@@ -280,14 +287,14 @@ function createApp(cfg, { audit = () => {}, logger = console } = {}) {
   app.post('/api/validate', requireAjax, requireAuth, upload.single('file'), wrap(async (req, res) => {
     const started = Date.now();
     const template = templates.get(String(req.body.template || ''));
-    if (!template) return res.status(400).json({ error: 'Seleccione una plantilla válida.' });
+    if (!template) return res.status(400).json({ error: 'Seleccione el modelo al que va a cargar.' });
     if (!req.file) return res.status(400).json({ error: 'Adjunte el archivo a cargar.' });
 
     const version = String(req.body.version || '').trim();
     const importMethod = String(req.body.importMethod || 'Update');
     const allowedMethods = template.importMethods || ['Update'];
     if (!allowedMethods.includes(importMethod)) {
-      return res.status(400).json({ error: `El método "${importMethod}" no está habilitado para la plantilla ${template.id}.` });
+      return res.status(400).json({ error: `El método "${importMethod}" no está habilitado para ${template.name}.` });
     }
 
     const client = clientFor(req.auth);
