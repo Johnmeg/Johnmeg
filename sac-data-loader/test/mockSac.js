@@ -97,21 +97,23 @@ button{margin-top:18px;width:100%;padding:10px;background:#0a6ed1;color:#fff;bor
 <form method="post" action="/oauth/authorize">${hidden}
 <h1>SAP Analytics Cloud</h1><p>Servidor simulado para demostración. Usuarios: <b>ana</b> / <b>demo</b> (planificador) o <b>luis</b> / <b>demo</b> (sin permiso de escritura).</p>
 ${q.err ? '<div class="err">Usuario o contraseña incorrectos.</div>' : ''}
-<label for="u">Usuario</label><input id="u" name="username" autocomplete="username" autofocus>
-<label for="p">Contraseña</label><input id="p" name="password" type="password" autocomplete="current-password">
+<label for="u">Usuario</label><input id="u" name="username" autocomplete="off" autocapitalize="none" spellcheck="false" autofocus>
+<label for="p">Contraseña</label><input id="p" name="password" type="password" autocomplete="off">
 <button type="submit">Iniciar sesión</button></form></body></html>`);
   });
 
   app.post('/oauth/authorize', (req, res) => {
     const b = req.body;
-    const user = USERS[b.username];
-    if (!user || user.password !== b.password) {
+    // Tolera mayúsculas y espacios que agregan el autocompletado o el teclado
+    const username = String(b.username || '').trim().toLowerCase();
+    const user = Object.hasOwn(USERS, username) ? USERS[username] : null;
+    if (!user || user.password !== String(b.password || '').trim()) {
       const back = new URLSearchParams({ ...b, err: '1' });
       back.delete('username'); back.delete('password');
       return res.redirect(`/oauth/authorize?${back}`);
     }
     const code = crypto.randomBytes(16).toString('hex');
-    codes.set(code, { username: b.username, redirectUri: b.redirect_uri, challenge: b.code_challenge || null, at: Date.now() });
+    codes.set(code, { username, redirectUri: b.redirect_uri, challenge: b.code_challenge || null, at: Date.now() });
     const u = new URL(b.redirect_uri);
     u.searchParams.set('code', code);
     if (b.state) u.searchParams.set('state', b.state);
