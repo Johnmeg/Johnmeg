@@ -1,5 +1,7 @@
 # Guía de despliegue en un servidor
 
+> Versión en Word: [`docs/Guia_Despliegue_Cargador_SAC.docx`](docs/Guia_Despliegue_Cargador_SAC.docx)
+
 Esta guía explica cómo publicar el **Cargador de datos a SAC** en un servidor, para que el equipo de planeación de Ciudad Limpia lo use desde el navegador con una dirección fija, por ejemplo `https://cargas-sac.ciudadlimpia.com`. Así nadie tiene que instalar Node.js en su computador.
 
 Cada usuario sigue entrando con **sus propias credenciales de SAP Analytics Cloud**. El servidor nunca ve contraseñas y cada carga se hace con los permisos de quien la ejecuta.
