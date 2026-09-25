@@ -3,33 +3,48 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Carga de datos a SAC</title>
+  <title>Carga de datos a SAC · Ciudad Limpia</title>
+  <link rel="icon" type="image/png" href="img/logo-ciudad-limpia.png">
   <link rel="stylesheet" href="styles.css">
   <script src="app.js" defer></script>
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <span class="logo" aria-hidden="true">▲</span>
-      <div>
-        <strong>Carga de datos a SAC</strong>
-        <small>Modelos de planeación · SAP Analytics Cloud</small>
+  <div class="utilbar">
+    <div class="wrap utilbar-inner">
+      <span class="util-label">Planeación financiera · SAP Analytics Cloud</span>
+      <div class="user" id="userBox" hidden>
+        <span class="avatar" id="userInitials" aria-hidden="true"></span>
+        <div class="user-text">
+          <span id="userName"></span>
+          <small id="userTenant"></small>
+        </div>
+        <button type="button" class="btn ghost small on-dark" id="logoutBtn">Cerrar sesión</button>
       </div>
     </div>
-    <div class="user" id="userBox" hidden>
-      <span class="avatar" id="userInitials" aria-hidden="true"></span>
-      <div class="user-text">
-        <span id="userName"></span>
-        <small id="userTenant"></small>
-      </div>
-      <button type="button" class="btn ghost small" id="logoutBtn">Cerrar sesión</button>
+  </div>
+
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="/" aria-label="Ciudad Limpia · Carga de datos a SAC">
+        <img class="logo logo-color" src="img/logo-ciudad-limpia.png" alt="Ciudad Limpia" width="176" height="54">
+        <img class="logo logo-white" src="img/logo-ciudad-limpia-blanco.png" alt="" width="176" height="54">
+      </a>
+      <span class="app-name">Carga de datos a SAC</span>
     </div>
   </header>
+
+  <section class="hero">
+    <div class="wrap">
+      <p class="kicker">Planeación financiera</p>
+      <h1 class="hero-title">Carga de datos a los modelos de planeación</h1>
+      <p class="hero-text">Valide su archivo de Excel o plano y cárguelo a SAP Analytics Cloud con su propio usuario.</p>
+    </div>
+  </section>
 
   <main>
     <!-- ======================================================= inicio de sesión -->
     <section id="loginView" class="card login" hidden>
-      <h1>Inicie sesión con su usuario de SAP Analytics Cloud</h1>
+      <h2>Inicie sesión con su usuario de SAP Analytics Cloud</h2>
       <p>La carga se hace con <b>sus propios permisos</b>: SAC aplica sus roles y el control de acceso a datos
         (Data Access Control) de cada modelo. Esta aplicación no ve ni guarda su contraseña; la autenticación
         se hace en la página de inicio de sesión de SAC o de su proveedor de identidad corporativo.</p>
@@ -169,6 +184,13 @@
       </section>
     </div>
   </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <span>Ciudad Limpia · Planeación financiera</span>
+      <span>Los datos se cargan con su usuario de SAP Analytics Cloud</span>
+    </div>
+  </footer>
 
   <div class="toast" id="toast" role="status" hidden></div>
 </body>
