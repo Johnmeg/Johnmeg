@@ -93,6 +93,50 @@ La aplicación lee su configuración del archivo `.env` en la carpeta `sac-data-
 
 ## Opción A: Windows Server + IIS
 
+### Instalación automática (recomendada)
+
+El script `deploy\windows-iis\Instalar-CargadorSAC.ps1` hace los pasos A1 a A3 de una sola vez:
+- instala la aplicación y crea el `.env`, pidiendo los datos de SAC; el Secret no se muestra al escribirlo;
+- crea el servicio de Windows con NSSM y lo protege;
+- instala IIS, URL Rewrite y ARR si faltan, y crea el sitio HTTPS;
+- abre el firewall y verifica que todo responda.
+
+**Antes de ejecutarlo:**
+1. Tenga **Node.js LTS** instalado, o agregue `-InstalarNode` al comando.
+2. Tenga el **certificado HTTPS** del dominio en *Equipo local → Personal*, o use `-ArchivoPfx C:\ruta\certificado.pfx`.
+3. Tenga a mano el **cliente OAuth de producción** del paso 3.
+4. Copie la carpeta `sac-data-loader` del ZIP al servidor, por ejemplo en `C:\instalador\sac-data-loader`.
+
+**Ejecución:** abra **PowerShell como administrador** y escriba:
+```
+cd C:\instalador\sac-data-loader
+powershell -ExecutionPolicy Bypass -File .\deploy\windows-iis\Instalar-CargadorSAC.ps1 -Dominio cargas-sac.ciudadlimpia.com
+```
+
+**Parámetros opcionales:**
+
+| Parámetro | Uso |
+|---|---|
+| `-InstalarNode` | Descarga e instala Node.js 22 LTS si no está |
+| `-Certificado <huella>` / `-ArchivoPfx <ruta>` | Certificado HTTPS a usar. Si no se indica, se busca uno vigente para el dominio |
+| `-Proxy http://proxy:puerto` | Proxy corporativo para la salida a internet (npm y SAC) |
+| `-CertificadoRaizCA <ruta .pem>` | Si el proxy inspecciona TLS |
+| `-CuentaServicio LocalSystem` | Solo si el servicio no arranca con la cuenta por defecto, `LocalService` |
+| `-RutaApp`, `-RutaSitio`, `-Puerto` | Cambian `C:\apps\sac-data-loader`, `C:\inetpub\sac-data-loader` y `3000` |
+| `-RutaNssm <ruta>` | Si el servidor no puede descargar NSSM de nssm.cc |
+| `-Reconfigurar` | Vuelve a pedir los datos de SAC y reescribe el `.env` |
+| `-SinIIS` | Solo instala la aplicación y el servicio |
+
+- **Actualizar a una versión nueva:** ejecute el mismo comando desde la carpeta de la versión nueva. Se conservan el `.env` y los registros.
+- **Registro de la instalación:** queda en `C:\apps\sac-data-loader\logs\instalacion-*.log`.
+- **Desinstalar:** use `deploy\windows-iis\Desinstalar-CargadorSAC.ps1`. Agregue `-BorrarArchivos` para eliminar también la carpeta; antes se guarda una copia del `.env` y de los registros.
+
+Luego continúe en la **sección 5 (verificación)**.
+
+### Instalación manual
+
+Siga estos pasos si prefiere no usar el script o necesita revisar algo en detalle.
+
 ### A1. Instalar la aplicación
 1. Instale **Node.js LTS (x64)** desde https://nodejs.org con las opciones por defecto.
 2. Copie la carpeta `sac-data-loader` del ZIP a `C:\apps\sac-data-loader`, **sin** la carpeta `node_modules`.
