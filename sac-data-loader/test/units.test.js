@@ -230,3 +230,15 @@ test('config: en .env gana la última línea repetida y se detecta texto de ejem
     SAC_CLIENT_ID: 'a', SAC_CLIENT_SECRET: 'b', SESSION_SECRET: 'x'.repeat(40),
   }), /SAC_AUTHORIZE_URL/);
 });
+
+test('sacClient: identifica el job en distintas formas de respuesta', () => {
+  const { findJobId } = require('../src/sacClient');
+  const h = (loc) => ({ get: (k) => (k === 'location' ? loc : null) });
+  assert.equal(findJobId({ JobID: 'J1', JobURL: 'x' }), 'J1');
+  assert.equal(findJobId({ jobID: 'J2' }), 'J2');
+  assert.equal(findJobId({ jobId: 'J3' }), 'J3');
+  assert.equal(findJobId({ jobURL: 'https://t/api/v1/dataimport/jobs/J4' }), 'J4');
+  assert.equal(findJobId({ value: { JobID: 'J5' } }), 'J5');
+  assert.equal(findJobId(null, h('/api/v1/dataimport/jobs/J6')), 'J6');
+  assert.equal(findJobId({ raw: '<html>' }, h('')), null);
+});

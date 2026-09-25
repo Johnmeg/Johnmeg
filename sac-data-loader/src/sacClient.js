@@ -6,6 +6,35 @@
 //
 // Referencia: https://help.sap.com/docs/SAP_ANALYTICS_CLOUD/14cac91febef464dbb1efce20e3f1613/fe6efb8aba9444c6a3ce21eef02bba62.html
 
+const DEBUG = process.env.SAC_DEBUG === 'true';
+
+// La documentación devuelve { JobID, JobURL }, pero se acepta cualquier
+// variante de mayúsculas, un objeto anidado o la cabecera Location.
+function findJobId(data, headers) {
+  const scan = (obj, depth = 0) => {
+    if (!obj || typeof obj !== 'object' || depth > 2) return null;
+    for (const [k, v] of Object.entries(obj)) {
+      if (/^job_?id$/i.test(k) && (typeof v === 'string' || typeof v === 'number') && String(v)) return String(v);
+    }
+    for (const [k, v] of Object.entries(obj)) {
+      if (/^job_?url$/i.test(k) && typeof v === 'string') {
+        const m = v.match(/\/jobs\/([^/?#]+)/);
+        if (m) return decodeURIComponent(m[1]);
+      }
+    }
+    for (const v of Object.values(obj)) {
+      const found = scan(v, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  };
+  const fromBody = scan(data);
+  if (fromBody) return fromBody;
+  const loc = headers?.get?.('location') || '';
+  const m = loc.match(/\/jobs\/([^/?#]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
 class SacError extends Error {
   constructor(status, message, details) {
     super(message);
@@ -66,6 +95,7 @@ class SacClient {
       method, headers: h, body, redirect: 'manual', signal: AbortSignal.timeout(this.timeoutMs),
     });
     this.storeCookies(res);
+    if (DEBUG) console.log(`[SAC] ${method} ${url} -> ${res.status} ${res.headers.get('content-type') || ''}`);
     return res;
   }
 
@@ -87,6 +117,8 @@ class SacClient {
         continue;
       }
       const text = await res.text();
+      if (DEBUG) console.log(`[SAC]   respuesta: ${text.slice(0, 500)}`);
+      this.lastHeaders = res.headers;
       let data = null;
       if (text) { try { data = JSON.parse(text); } catch { data = { raw: text }; } }
       if (res.status === 404 && allow404) return null;
@@ -113,8 +145,12 @@ class SacClient {
   // ------------------------------------------------------------ jobs
   async createJob(modelId, importType, body) {
     const data = await this.call('POST', this.importUrl(`/models/${encodeURIComponent(modelId)}/${importType}`), { json: body, csrf: true });
-    if (!data?.JobID) throw new SacError(500, 'SAC no devolvió el identificador del job de importación.', data);
-    return data.JobID;
+    const jobId = findJobId(data, this.lastHeaders);
+    if (!jobId) {
+      const seen = data?.raw !== undefined ? String(data.raw).slice(0, 200) : JSON.stringify(data)?.slice(0, 200);
+      throw new SacError(500, `SAC no devolvió el identificador del job de importación. Respuesta de SAC: ${seen || '(vacía)'}`, data);
+    }
+    return jobId;
   }
 
   async postData(jobId, rows) {
@@ -170,4 +206,4 @@ class SacClient {
   }
 }
 
-module.exports = { SacClient, SacError };
+module.exports = { SacClient, SacError, findJobId };
