@@ -1,9 +1,10 @@
 // Instalador .exe del Cargador de datos a SAC.
 //
-// Lleva adentro (go:embed) el paquete completo: la aplicación con sus librerías,
-// Node.js portátil y los scripts de instalación. Al ejecutarlo lo extrae en una
-// carpeta temporal y corre Instalar-CargadorSAC-Usuario.ps1, que instala para el
-// usuario actual sin permisos de administrador y sin descargar nada.
+// Lleva adentro (go:embed) el paquete: la aplicación con sus librerías, los
+// scripts de instalación y, salvo en la versión liviana, Node.js portátil. Al
+// ejecutarlo lo extrae en una carpeta temporal y corre
+// Instalar-CargadorSAC-Usuario.ps1, que instala para el usuario actual sin
+// permisos de administrador.
 //
 // Los argumentos se pasan tal cual al script, p. ej.:
 //

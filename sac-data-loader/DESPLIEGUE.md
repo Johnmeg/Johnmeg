@@ -303,7 +303,7 @@ Para generarlo se necesitan Node.js 20 o superior, npm y Go 1.22 o superior, en 
 node deploy/windows-usuario/build-exe.js fanalca
 node deploy/windows-usuario/build-exe.js ciudadlimpia
 ```
-Quedan en `dist/` el `.exe` y un ZIP con el mismo contenido (`CargadorSAC-Fanalca-Instalador-completo.zip`). Con `--config-empresa C:\ruta\.env` incluye los datos de SAC, igual que `Crear-Paquete.ps1`. En ese caso comparta el `.exe` **solo con usuarios autorizados**, porque lleva el Secret.
+Quedan en `dist/` el `.exe` y un ZIP con el mismo contenido (`CargadorSAC-Fanalca-Instalador-completo.zip`). Con `--liviano` se genera `Instalar-CargadorSAC-Fanalca-liviano.exe` (unos 11 MB): no trae Node.js, así que lo descarga de nodejs.org al instalar o usa el Node.js 20 o superior que ya tenga el equipo. Sirve cuando el archivo se envía por un canal con límite de tamaño. Con `--config-empresa C:\ruta\.env` incluye los datos de SAC, igual que `Crear-Paquete.ps1`. En ese caso comparta el `.exe` **solo con usuarios autorizados**, porque lleva el Secret.
 
 Para instalar, el usuario hace **doble clic en el `.exe`**. Como no está firmado digitalmente, Windows puede mostrar *"Windows protegió su PC"*: pulse **Más información → Ejecutar de todas formas**. Si la política de la empresa bloquea programas sin firma, use el ZIP con `Instalar.cmd` o firme el `.exe` con el certificado de firma de código de la empresa (`signtool sign /fd SHA256 /a Instalar-CargadorSAC-Fanalca.exe`).
 

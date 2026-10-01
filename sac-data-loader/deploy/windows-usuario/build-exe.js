@@ -15,6 +15,10 @@
 //   Instalar-CargadorSAC-<Marca>.exe        instalador de un solo archivo
 //   CargadorSAC-<Marca>-Instalador-completo.zip   el mismo contenido en ZIP
 //
+// Opcional: --liviano no incluye Node.js (unos 35 MB menos): el instalador lo
+// descarga de nodejs.org o usa el Node.js 20+ que ya tenga el equipo. Resultado:
+//   Instalar-CargadorSAC-<Marca>-liviano.exe
+//
 // Opcional: --config-empresa <ruta .env> incluye los datos del cliente OAuth de
 // SAC para que el usuario no tenga que escribirlos. Lleva el Secret: comparta el
 // resultado sólo con usuarios autorizados.
@@ -38,6 +42,7 @@ const args = process.argv.slice(2);
 const marca = (args.find((a) => !a.startsWith('--')) || 'fanalca').toLowerCase();
 const iCfg = args.indexOf('--config-empresa');
 const configEmpresa = iCfg >= 0 ? args[iCfg + 1] : null;
+const liviano = args.includes('--liviano');
 
 const log = (m) => console.log(`» ${m}`);
 const run = (cmd, a, opts = {}) => execFileSync(cmd, a, { stdio: 'inherit', ...opts });
@@ -108,8 +113,10 @@ async function zipDir(dir, out) {
     log('Instalando librerías de la aplicación (npm ci --omit=dev)...');
     run(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund', '--loglevel=error'], { cwd: app, shell: process.platform === 'win32' });
 
-    const node = await nodeZip();
-    fs.copyFileSync(node.file, path.join(ins, node.name));
+    if (!liviano) {
+      const node = await nodeZip();
+      fs.copyFileSync(node.file, path.join(ins, node.name));
+    }
 
     for (const f of ['Instalar-CargadorSAC-Usuario.ps1', 'Abrir-CargadorSAC.cmd', 'Detener-CargadorSAC.cmd', 'Desinstalar-CargadorSAC.cmd']) {
       fs.copyFileSync(path.join(__dirname, f), path.join(ins, f));
@@ -144,11 +151,12 @@ async function zipDir(dir, out) {
 
     log('Compilando el .exe...');
     fs.mkdirSync(DIST, { recursive: true });
-    const exe = path.join(DIST, `Instalar-CargadorSAC-${nombre}.exe`);
+    const sufijo = liviano ? '-liviano' : '';
+    const exe = path.join(DIST, `Instalar-CargadorSAC-${nombre}${sufijo}.exe`);
     run('go', ['build', '-trimpath', '-ldflags', '-s -w', '-o', exe, '.'], {
       cwd: EXE_DIR, env: { ...process.env, GOOS: 'windows', GOARCH: 'amd64', CGO_ENABLED: '0' },
     });
-    const zipOut = path.join(DIST, `CargadorSAC-${nombre}-Instalador-completo.zip`);
+    const zipOut = path.join(DIST, `CargadorSAC-${nombre}-Instalador${liviano ? '-liviano' : '-completo'}.zip`);
     fs.copyFileSync(payload, zipOut);
     fs.rmSync(payload);
     fs.rmSync(syso);
