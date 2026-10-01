@@ -9,6 +9,7 @@ COPY server.js ./
 COPY src ./src
 COPY public ./public
 COPY config ./config
+COPY brands ./brands
 USER node
 EXPOSE 3000
 HEALTHCHECK CMD wget -qO- http://127.0.0.1:3000/healthz || exit 1

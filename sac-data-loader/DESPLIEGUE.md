@@ -76,6 +76,7 @@ La aplicación lee su configuración del archivo `.env` en la carpeta `sac-data-
 
 | Variable | Valor en el servidor |
 |---|---|
+| `BRAND` | `ciudadlimpia` o `fanalca`: nombre, logo, colores y modelos. Para atender a las dos empresas, monte dos instancias, cada una con su URL, su `.env` y su Redirect URI |
 | `APP_BASE_URL` | `https://cargas-sac.ciudadlimpia.com`, la URL exacta que usarán los usuarios |
 | `HOST` | `127.0.0.1` en opciones A y B, para que el puerto 3000 no quede expuesto. **No la ponga** en BTP ni Docker |
 | `PORT` | `3000` (en BTP la asigna la plataforma) |
@@ -287,13 +288,32 @@ Para pocos usuarios, o mientras no haya servidor, cada persona puede instalar la
 | Instalación con doble clic y acceso directo en el escritorio | Cada usuario debe reinstalar cuando haya una versión nueva |
 | Cada usuario usa sus propios permisos de SAC | La auditoría queda en cada computador (`app\logs\audit.log`) |
 
-### E1. Preparar el paquete (lo hace el administrador, una vez)
-1. En SAC, el cliente OAuth (*Interactive Usage*) debe tener la Redirect URI **`http://localhost:3000/auth/callback`**. Es la misma que ya usa en su computador.
+Hay un paquete por empresa. Cada uno se instala en su propia carpeta y usa su propio puerto, así que un usuario puede tener las dos versiones:
+
+| Empresa | Carpeta | Acceso directo | Dirección y Redirect URI |
+|---|---|---|---|
+| Ciudad Limpia | `%LOCALAPPDATA%\CargadorSAC` | *Cargador de datos a SAC* | `http://localhost:3000` → `http://localhost:3000/auth/callback` |
+| Fanalca | `%LOCALAPPDATA%\CargadorSAC-Fanalca` | *Cargador de datos a SAC - Fanalca* | `http://localhost:3001` → `http://localhost:3001/auth/callback` |
+
+### E0. Instalador .exe con todo incluido (recomendado)
+Un solo archivo, por ejemplo **`Instalar-CargadorSAC-Fanalca.exe`** (unos 45 MB). Trae adentro la aplicación, sus librerías y Node.js portátil, así que **no descarga nada al instalar** y funciona en redes con proxy. No pide permisos de administrador.
+
+Para generarlo se necesitan Node.js 20 o superior, npm y Go 1.22 o superior, en Windows, Linux o macOS. Desde la carpeta `sac-data-loader`:
+```
+node deploy/windows-usuario/build-exe.js fanalca
+node deploy/windows-usuario/build-exe.js ciudadlimpia
+```
+Quedan en `dist/` el `.exe` y un ZIP con el mismo contenido (`CargadorSAC-Fanalca-Instalador-completo.zip`). Con `--config-empresa C:\ruta\.env` incluye los datos de SAC, igual que `Crear-Paquete.ps1`. En ese caso comparta el `.exe` **solo con usuarios autorizados**, porque lleva el Secret.
+
+Para instalar, el usuario hace **doble clic en el `.exe`**. Como no está firmado digitalmente, Windows puede mostrar *"Windows protegió su PC"*: pulse **Más información → Ejecutar de todas formas**. Si la política de la empresa bloquea programas sin firma, use el ZIP con `Instalar.cmd` o firme el `.exe` con el certificado de firma de código de la empresa (`signtool sign /fd SHA256 /a Instalar-CargadorSAC-Fanalca.exe`).
+
+### E1. Preparar el paquete ZIP (lo hace el administrador, una vez)
+1. En SAC, el cliente OAuth (*Interactive Usage*) debe tener la Redirect URI de la empresa (tabla anterior). Para Ciudad Limpia es **`http://localhost:3000/auth/callback`**, la misma que ya usa en su computador. Para Fanalca es **`http://localhost:3001/auth/callback`**.
 2. En su computador, desde la carpeta `sac-data-loader`, arme el paquete pasándole un `.env` que ya funcione:
    ```
-   powershell -ExecutionPolicy Bypass -File .\deploy\windows-usuario\Crear-Paquete.ps1 -ConfigEmpresa C:\ruta\sac-data-loader\.env
+   powershell -ExecutionPolicy Bypass -File .\deploy\windows-usuario\Crear-Paquete.ps1 -Marca fanalca -ConfigEmpresa C:\ruta\sac-data-loader\.env
    ```
-   Genera `CargadorSAC-Instalador.zip`. Del `.env` solo se copian los datos de SAC al archivo `config-empresa.env`, para que los usuarios no tengan que escribirlos. Cada usuario recibe su propia clave de sesión.
+   Genera `CargadorSAC-Fanalca-Instalador.zip`. Sin `-Marca` genera el de Ciudad Limpia, `CargadorSAC-Instalador.zip`. Del `.env` solo se copian los datos de SAC al archivo `config-empresa.env`, para que los usuarios no tengan que escribirlos. Cada usuario recibe su propia clave de sesión.
    - Sin `-ConfigEmpresa`, el instalador pedirá los datos de SAC a cada usuario.
 3. Comparta el ZIP **solo con usuarios autorizados**, por ejemplo en una carpeta de Teams o SharePoint con acceso restringido, porque contiene el Secret.
 

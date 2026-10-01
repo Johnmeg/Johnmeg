@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const path = require('path');
 const { createMockSac, CLIENT_ID, CLIENT_SECRET } = require('../test/mockSac');
 const { loadTemplates } = require('../src/config');
+const { loadBrand } = require('../src/brand');
 const { createApp } = require('../src/app');
 const { createAudit } = require('../src/audit');
 
@@ -16,7 +17,8 @@ const SAC_PORT = Number(process.env.MOCK_SAC_PORT || 4010);
 const appUrl = `http://localhost:${APP_PORT}`;
 const sacUrl = `http://localhost:${SAC_PORT}`;
 
-const mock = createMockSac({ baseUrl: sacUrl, redirectUris: [`${appUrl}/auth/callback`] });
+const brand = loadBrand(process.env.BRAND); // BRAND=fanalca npm run demo
+const mock = createMockSac({ baseUrl: sacUrl, redirectUris: [`${appUrl}/auth/callback`], brand: brand.id });
 mock.app.listen(SAC_PORT, () => console.log(`SAC simulado en ${sacUrl}`));
 
 const cfg = {
@@ -40,12 +42,13 @@ const cfg = {
   numberLocale: 'es',
   blockedVersions: ['public.Actual'],
   validateMembers: true,
-  templates: loadTemplates(path.join(__dirname, '..', 'config', 'templates.json')),
+  brand,
+  templates: loadTemplates(brand.templatesFile || path.join(__dirname, '..', 'config', 'templates.json')),
 };
 
 const app = createApp(cfg, { audit: createAudit(path.join(__dirname, '..', 'logs', 'audit-demo.log')) });
 app.listen(APP_PORT, () => {
-  console.log(`Aplicación en ${appUrl}`);
+  console.log(`Aplicación (${brand.name}) en ${appUrl}`);
   console.log('Usuarios de prueba: ana / demo (puede cargar), luis / demo (sin permiso de escritura)');
   console.log('Archivos de ejemplo en ./samples');
 });

@@ -88,5 +88,37 @@ function csv(file, lines) {
     ['CL_BOG', 'FC_CAPEX', 'RECOLECCION', 'CECO_OPER', 'MANUAL', 'COP', ...doce(-35000000)],
   ]);
 
+  // ------------------------------------------------------------ Fanalca (BRAND=fanalca)
+  const FN = path.join(OUT, 'fanalca');
+  fs.mkdirSync(FN, { recursive: true });
+  const fn = (f) => path.join('fanalca', f);
+  const GASTOS_FN = ['Sociedades', 'Cecos', 'Cebes', 'Cuentas_Egresos', 'Auditoria', 'Moneda'];
+  await excel(fn('Gastos_FN_valido.xlsx'), [...GASTOS_FN, ...MESES], [
+    ['FN_MOTOS', 'CC_PLANTA', 'CB_MOTOS', '5105_SALARIOS', 'PRESUPUESTO_EXCEL', 'COP', ...doce(95000000)],
+    ['FN_MOTOS', 'CC_PLANTA', 'CB_MOTOS', '5145_MANTENIMIENTO', 'PRESUPUESTO_EXCEL', 'COP', ...doce(12500000.5)],
+    ['FN_TUBOS', 'CC_ADMIN', 'CB_TUBERIA', '5135_SERVICIOS', 'PRESUPUESTO_EXCEL', 'COP', ...doce(4300000)],
+    ['FN_AUTOS', 'CC_VENTAS', 'CB_AUTOS', '5160_DEPRECIACION', 'PRESUPUESTO_EXCEL', 'COP', ...doce(7800000)],
+  ]);
+  csv(fn('Gastos_FN_con_errores.csv'), [
+    [...GASTOS_FN, ...MESES],
+    ['FN_MOTOS', 'CC_PLANTA', 'CB_MOTOS', '5105_SALARIOS', 'PRESUPUESTO_EXCEL', 'COP', ...doce('95.000.000')],
+    ['FN_MOTOS', 'CC_PLANTA', 'CB_MOTOS', '9999_NO_EXISTE', 'PRESUPUESTO_EXCEL', 'COP', ...doce('10')],      // cuenta inexistente
+    ['FN_HONDA', 'CC_ADMIN', 'CB_MOTOS', '5135_SERVICIOS', 'PRESUPUESTO_EXCEL', 'COP', ...doce('10')],       // sociedad inexistente
+    ['FN_TUBOS', 'CC_ADMIN', 'CB_TUBERIA', '5135_SERVICIOS', 'PRESUPUESTO_EXCEL', 'COP', 'mil', ...doce('5').slice(1)], // número inválido
+    ['FN_MOTOS', 'CC_PLANTA', 'CB_MOTOS', '5105_SALARIOS', 'PRESUPUESTO_EXCEL', 'COP', ...doce('1')],        // fila repetida
+  ]);
+  const ING_FN = ['Sociedades', 'Cebes', 'Clientes', 'Referencias', 'Ratio', 'Auditoria', 'Moneda'];
+  await excel(fn('Ingresos_FN_valido.xlsx'), [...ING_FN, ...MESES], [
+    ['FN_MOTOS', 'CB_MOTOS', 'CLI_001', 'REF_CB125', 'UNIDADES', 'PRESUPUESTO_EXCEL', 'COP', ...doce(1800)],
+    ['FN_MOTOS', 'CB_MOTOS', 'CLI_001', 'REF_CB125', 'PRECIO', 'PRESUPUESTO_EXCEL', 'COP', ...doce(9890000)],
+    ['FN_TUBOS', 'CB_TUBERIA', 'CLI_002', 'REF_TUBO_2P', 'ING_VENTAS_NAL', 'PRESUPUESTO_EXCEL', 'COP', ...doce(350000000)],
+  ]);
+  const EEFF_FN = ['Sociedades', 'Cuentas_EF', 'Cebes', 'Auditoria', 'Moneda'];
+  await excel(fn('EEFF_FN_valido.xlsx'), [...EEFF_FN, ...MESES], [
+    ['FN_MOTOS', '1105_CAJA', 'CB_CORPORATIVO', 'MANUAL', 'COP', ...doce(250000000)],
+    ['FN_MOTOS', '1435_INVENTARIOS', 'CB_MOTOS', 'MANUAL', 'COP', ...doce(980000000)],
+    ['FN_TUBOS', '2205_PROVEEDORES', 'CB_TUBERIA', 'MANUAL', 'COP', ...doce(-410000000)],
+  ]);
+
   console.log(`Ejemplos generados en ${OUT}`);
 })();

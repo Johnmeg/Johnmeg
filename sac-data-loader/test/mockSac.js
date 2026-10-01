@@ -12,8 +12,8 @@ const express = require('express');
 const CLIENT_ID = 'sac-loader-demo';
 const CLIENT_SECRET = 'demo-secret';
 const USERS = {
-  ana: { password: 'demo', given_name: 'Ana', family_name: 'Planeación', email: 'ana@ciudadlimpia.test' },
-  luis: { password: 'demo', given_name: 'Luis', family_name: 'Sin Permisos', email: 'luis@ciudadlimpia.test', readOnly: true },
+  ana: { password: 'demo', given_name: 'Ana', family_name: 'Planeación', email: 'ana@demo.test' },
+  luis: { password: 'demo', given_name: 'Luis', family_name: 'Sin Permisos', email: 'luis@demo.test', readOnly: true },
 };
 
 const VERSIONS = ['public.Actual', 'public.Plan', 'public.Forecast'];
@@ -54,6 +54,41 @@ const MODELS = {
   },
 };
 
+// Modelos de Fanalca (dimensiones reales, miembros ficticios)
+const COMMON_FN = {
+  Sociedades: ['FN_MOTOS', 'FN_AUTOS', 'FN_TUBOS', 'FN_AUTOPARTES'],
+  Cebes: ['CB_MOTOS', 'CB_AUTOS', 'CB_TUBERIA', 'CB_CORPORATIVO'],
+  Moneda: ['COP', 'USD'],
+  Auditoria: ['PRESUPUESTO_EXCEL', 'MANUAL', 'AJUSTE', 'CALCULADO'],
+};
+Object.assign(MODELS, {
+  FN_INGRESOS: {
+    name: 'Modelo Ingresos FANALCA',
+    dims: {
+      ...COMMON_FN,
+      Ratio: ['ING_VENTAS_NAL', 'ING_VENTAS_EXP', 'UNIDADES', 'PRECIO'],
+      Clientes: ['CLI_001', 'CLI_002', 'CLI_003'],
+      Referencias: ['REF_CB125', 'REF_XRE300', 'REF_TUBO_2P'],
+    },
+  },
+  FN_GASTOS: {
+    name: 'Modelo Gastos FANALCA',
+    dims: {
+      ...COMMON_FN,
+      Cuentas_Egresos: ['5105_SALARIOS', '5135_SERVICIOS', '5145_MANTENIMIENTO', '5160_DEPRECIACION'],
+      Cecos: ['CC_ADMIN', 'CC_PLANTA', 'CC_VENTAS'],
+    },
+  },
+  FN_EEFF: {
+    name: 'Modelo EEFF FANALCA',
+    dims: {
+      ...COMMON_FN,
+      Cuentas_EF: ['1105_CAJA', '1305_CLIENTES', '1435_INVENTARIOS', '2205_PROVEEDORES'],
+    },
+  },
+});
+const MODEL_PREFIX = { ciudadlimpia: 'CL_', fanalca: 'FN_' };
+
 function metadataOf(modelId) {
   const m = MODELS[modelId];
   const columns = [
@@ -67,7 +102,8 @@ function metadataOf(modelId) {
 
 const b64url = (s) => Buffer.from(s).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
-function createMockSac({ baseUrl, redirectUris = [], tokenTtlSec = 3600, logger = () => {} } = {}) {
+function createMockSac({ baseUrl, redirectUris = [], tokenTtlSec = 3600, logger = () => {}, brand = 'ciudadlimpia' } = {}) {
+  const prefix = MODEL_PREFIX[brand] || 'CL_';
   const app = express();
   const codes = new Map(); const tokens = new Map(); const refreshTokens = new Map();
   const csrfTokens = new Map(); // access token -> csrf
@@ -187,7 +223,7 @@ ${q.err ? '<div class="err">Usuario o contraseña incorrectos.</div>' : ''}
   const IMP = '/api/v1/dataimport';
   app.get(`${IMP}/models`, auth, (req, res) => {
     res.json({
-      models: Object.entries(MODELS).map(([id, m]) => ({
+      models: Object.entries(MODELS).filter(([id]) => id.startsWith(prefix)).map(([id, m]) => ({
         modelID: id, modelName: m.name, description: m.name, modelURL: `${baseUrl}${IMP}/models/${id}`,
       })),
     });

@@ -2,7 +2,9 @@
 rem Quita el Cargador de datos a SAC de este computador (usuario actual).
 setlocal EnableExtensions
 set "BASE=%~dp0"
-echo Se quitara el Cargador de datos a SAC de este computador,
+set "TITULO=Cargador de datos a SAC"
+if exist "%BASE%config.cmd" call "%BASE%config.cmd"
+echo Se quitara "%TITULO%" de este computador,
 echo incluida su configuracion y sus registros.
 choice /M "Desea continuar"
 if errorlevel 2 exit /b 0
@@ -15,7 +17,7 @@ if defined PID (
   tasklist /FI "PID eq %PID%" /FI "IMAGENAME eq node.exe" 2>nul | find /I "node.exe" >nul && taskkill /PID %PID% /T /F >nul 2>&1
 )
 
-powershell.exe -NoProfile -Command "Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Cargador de datos a SAC.lnk') -Force -ErrorAction SilentlyContinue; Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath('Programs')) 'Cargador de datos a SAC') -Recurse -Force -ErrorAction SilentlyContinue"
+powershell.exe -NoProfile -Command "Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath('Desktop')) ($env:TITULO + '.lnk')) -Force -ErrorAction SilentlyContinue; Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath('Programs')) $env:TITULO) -Recurse -Force -ErrorAction SilentlyContinue"
 
 set "CARPETA=%BASE:~0,-1%"
 echo Listo. Se eliminara la carpeta %CARPETA%

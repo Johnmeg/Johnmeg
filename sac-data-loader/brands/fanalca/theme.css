@@ -1,0 +1,108 @@
+/* Identidad visual de Fanalca (fanalca.com):
+   azul marino #071D49 (encabezado y pie), azul institucional #005EB8,
+   azul cielo #0085CF y cian #00AFE7 (franja degradada), títulos livianos en
+   azul con una línea corta debajo, tipografía Gotham y botones rectos. */
+
+:root {
+  --brand-950: #05132f;
+  --brand-800: #071d49;
+  --brand-700: #005eb8;
+  --brand-500: #0085cf;
+  --brand-200: #9fd3f2;
+  --brand-50: #e8f2fb;
+
+  --bg: #f4f7fb;
+  --surface: #ffffff;
+  --text: #1d2433;
+  --heading: #005eb8;
+  --muted: #5b6578;
+  --line: #d9e2ee;
+  --primary: #005eb8;
+  --primary-hover: #071d49;
+  --primary-ink: #ffffff;
+  --primary-soft: #e8f2fb;
+  --accent: #00afe7;
+  --ok: #1a7f37;
+  --ok-soft: #e6f4ea;
+  --radius: 5px;
+  --pill: 3px;
+  --shadow: 0 1px 2px rgba(7, 29, 73, .06), 0 8px 22px rgba(7, 29, 73, .08);
+  --font: "Gotham", "Gotham Book", "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-title: var(--font);
+  --gradient: linear-gradient(90deg, #0061ba 0%, #0085cf 50%, #00afe7 100%);
+  --logo-w: 186px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #06122a;
+    --surface: #0c1d3d;
+    --text: #e3e9f3;
+    --heading: #6fbef0;
+    --muted: #9fb0c8;
+    --line: #1f3459;
+    --primary: #4aa8ec;
+    --primary-hover: #79c0f2;
+    --primary-ink: #05132f;
+    --primary-soft: #12305a;
+    --ok: #7fd49a;
+    --ok-soft: #12321f;
+    --brand-200: #2d5a8f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+  }
+}
+
+/* Barra superior blanca con enlaces azules en mayúsculas, como en el sitio */
+.utilbar { background: var(--surface); color: var(--primary); border-bottom: 1px solid var(--brand-700); }
+.util-label { opacity: 1; text-transform: uppercase; letter-spacing: .04em; font-size: 13px; }
+.user-text { color: var(--text); }
+.avatar { background: var(--brand-800); color: #fff; }
+.btn.ghost.on-dark { color: var(--primary); border-color: var(--primary); }
+.btn.ghost.on-dark:hover { background: var(--primary-soft); }
+
+/* Encabezado azul marino con el logo blanco y la franja degradada */
+.topbar { background: var(--brand-800); border-bottom: 0; }
+.topbar::after { content: ""; display: block; height: 6px; background: var(--gradient); }
+.topbar-inner { min-height: 96px; }
+.logo-color { display: none; }
+.logo-white { display: block; }
+.app-name {
+  color: #fff; font-stretch: normal; font-weight: 400; letter-spacing: .08em; font-size: 16px;
+}
+
+/* Portada: título grande y liviano en azul con la línea corta debajo */
+.hero { background: var(--surface); color: var(--text); padding: 40px 0 36px; border-bottom: 1px solid var(--line); }
+.kicker {
+  color: var(--brand-500); font-stretch: normal; font-weight: 600; font-size: 14px;
+  letter-spacing: .12em; line-height: 1.4;
+}
+.hero-title {
+  color: var(--heading); font-stretch: normal; font-weight: 300; text-transform: none;
+  font-size: 44px; line-height: 1.1; letter-spacing: 0; margin: 6px 0 14px;
+}
+.hero-title::after { content: ""; display: block; width: 44px; height: 3px; background: var(--brand-500); margin-top: 16px; }
+.hero-text { color: var(--muted); opacity: 1; }
+
+/* Tarjetas con la franja degradada arriba, como el recuadro de la portada */
+.card { position: relative; overflow: hidden; border-top: 0; padding-top: 34px; }
+.card::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 6px; background: var(--gradient); }
+.card h2 {
+  font-stretch: normal; font-weight: 300; text-transform: none; font-size: 26px; letter-spacing: 0;
+}
+.card h2::after { content: ""; display: block; width: 44px; height: 3px; background: var(--brand-500); margin-top: 10px; }
+.login h2::after { margin-left: auto; margin-right: auto; }
+
+.btn { letter-spacing: .02em; }
+.stepper li.done span { background: var(--brand-500); }
+.tab.active { border-bottom-color: var(--brand-500); }
+th { background: var(--brand-800); }
+.facts div { border-top-color: var(--brand-500); }
+.progress .bar::after { background: var(--gradient); }
+.footer { background: var(--brand-800); }
+
+@media (max-width: 640px) {
+  .topbar-inner { min-height: 72px; }
+  .app-name { font-size: 13px; letter-spacing: .05em; }
+  .hero-title { font-size: 30px; }
+  .card h2 { font-size: 22px; }
+}

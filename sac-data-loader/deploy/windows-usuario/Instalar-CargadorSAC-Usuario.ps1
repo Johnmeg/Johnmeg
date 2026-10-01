@@ -1,13 +1,15 @@
 ﻿<#
 .SYNOPSIS
-  Instala el Cargador de datos a SAC (Ciudad Limpia) en el computador del usuario.
+  Instala el Cargador de datos a SAC (Ciudad Limpia, Fanalca) en el computador del usuario.
 
 .DESCRIPTION
-  No requiere permisos de administrador. Se instala en %LOCALAPPDATA%\CargadorSAC:
-    - Node.js portátil (sin instalador de Windows) si hace falta.
-    - La aplicación y sus dependencias.
+  No requiere permisos de administrador. Se instala en %LOCALAPPDATA%\<carpeta de la marca>
+  (CargadorSAC para Ciudad Limpia, CargadorSAC-Fanalca para Fanalca):
+    - Node.js portátil (sin instalador de Windows) si hace falta. Si el paquete trae
+      node-v*-win-x64.zip no descarga nada.
+    - La aplicación y sus dependencias (incluidas en el instalador .exe).
     - La configuración (.env), protegida para que sólo el usuario la lea.
-    - Accesos directos "Cargador de datos a SAC" en el escritorio y el menú Inicio.
+    - Accesos directos en el escritorio y el menú Inicio.
 
   Si junto al instalador hay un archivo config-empresa.env (preparado por el
   administrador), toma de ahí los datos de SAC y no los pregunta.
@@ -15,9 +17,12 @@
   Ejecutar con doble clic en Instalar.cmd. Se puede ejecutar de nuevo para
   actualizar: conserva la configuración y los registros.
 
+.PARAMETER Marca
+  ciudadlimpia o fanalca. Por defecto la del archivo marca.txt del paquete.
+
 .PARAMETER Puerto
-  Puerto local (por defecto 3000). Debe coincidir con la Redirect URI del cliente
-  OAuth en SAC: http://localhost:<Puerto>/auth/callback
+  Puerto local (por defecto el de la marca: 3000 Ciudad Limpia, 3001 Fanalca). Debe
+  coincidir con la Redirect URI del cliente OAuth en SAC: http://localhost:<Puerto>/auth/callback
 
 .PARAMETER Proxy
   Proxy corporativo, p. ej. http://proxy.empresa.local:8080
@@ -27,9 +32,11 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Destino = (Join-Path $env:LOCALAPPDATA 'CargadorSAC'),
-    [ValidateRange(1024, 65535)]
-    [int]$Puerto = 3000,
+    [ValidatePattern('^[a-z0-9-]*$')]
+    [string]$Marca,
+    [string]$Destino,
+    [ValidateRange(0, 65535)]
+    [int]$Puerto = 0,
     [string]$Proxy,
     [string]$CertificadoRaizCA,
     [string]$NodeZip,
@@ -42,7 +49,6 @@ $ProgressPreference = 'SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
 $Aqui = $PSScriptRoot
-$Titulo = 'Cargador de datos a SAC'
 $script:paso = 0
 
 # ------------------------------------------------------------------ utilidades
@@ -138,15 +144,35 @@ foreach ($c in @((Join-Path $Aqui '..\app'), (Join-Path $Aqui '..\..'))) {
 $ConfigEmpresa = @((Join-Path $Aqui '..\config-empresa.env'), (Join-Path $Aqui 'config-empresa.env')) |
     Where-Object { Test-Path $_ } | Select-Object -First 1
 
+# ------------------------------------------------------------------ marca (empresa)
+if (-not $Origen) {
+    Write-Host '  ERROR: No se encontró la aplicación junto al instalador. Extraiga todo el ZIP antes de ejecutar Instalar.cmd.' -ForegroundColor Red
+    exit 1
+}
+if (-not $Marca) {
+    $archivoMarca = @((Join-Path $Aqui 'marca.txt'), (Join-Path $Aqui '..\marca.txt')) | Where-Object { Test-Path $_ } | Select-Object -First 1
+    $Marca = if ($archivoMarca) { (Get-Content $archivoMarca -Raw).Trim().ToLower() } else { 'ciudadlimpia' }
+}
+$jsonMarca = Join-Path $Origen "brands\$Marca\brand.json"
+if ($Marca -notmatch '^[a-z0-9-]+$' -or -not (Test-Path $jsonMarca)) {
+    Write-Host "  ERROR: la marca '$Marca' no existe en el paquete." -ForegroundColor Red
+    exit 1
+}
+$infoMarca = [IO.File]::ReadAllText($jsonMarca, [Text.Encoding]::UTF8) | ConvertFrom-Json
+$NombreMarca = $infoMarca.name
+$Titulo = $infoMarca.installer.shortcut
+if (-not $Destino) { $Destino = Join-Path $env:LOCALAPPDATA $infoMarca.installer.folder }
+if (-not $Puerto) { $Puerto = [int]$infoMarca.installer.port }
+if ($Puerto -lt 1024) { Write-Host '  ERROR: el puerto debe estar entre 1024 y 65535.' -ForegroundColor Red; exit 1 }
+
 New-Item -ItemType Directory -Force -Path $Destino | Out-Null
 $transcript = Join-Path $Destino 'instalacion.log'
 Start-Transcript -Path $transcript | Out-Null
 
 try {
     Write-Host ''
-    Write-Host "  $Titulo - Ciudad Limpia" -ForegroundColor Green
+    Write-Host "  Cargador de datos a SAC - $NombreMarca" -ForegroundColor Green
     Write-Host "  Instalación para el usuario $env:USERNAME en $Destino" -ForegroundColor Green
-    if (-not $Origen) { Falla 'No se encontró la aplicación junto al instalador. Extraiga todo el ZIP antes de ejecutar Instalar.cmd.' }
 
     # -------------------------------------------------------------- 1. versión anterior abierta
     Paso 'Cerrando una versión anterior (si está abierta)'
@@ -173,6 +199,11 @@ try {
     if (Test-Path $NodeExe) { $v = Version-Node $NodeExe }
     if (-not $v -or $v.Major -lt 20) {
         $zip = $NodeZip
+        if (-not $zip) {
+            # Instalador .exe / paquete completo: Node.js portátil incluido junto al instalador
+            $incluido = Get-ChildItem $Aqui -Filter 'node-v*-win-x64.zip' -File -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1
+            if ($incluido) { $zip = $incluido.FullName; Ok "Node.js incluido en el paquete ($($incluido.Name))" }
+        }
         if (-not $zip) {
             try {
                 Write-Host '    Buscando la versión LTS de Node.js...'
@@ -225,15 +256,22 @@ try {
     New-Item -ItemType Directory -Force -Path (Join-Path $App 'logs') | Out-Null
     Ok "Aplicación en $App (se conservan .env y logs)"
 
-    Paso 'Instalando librerías (npm ci)'
-    if ($Proxy) { $env:HTTPS_PROXY = $Proxy; $env:HTTP_PROXY = $Proxy }
-    if ($CertificadoRaizCA) { $env:NODE_EXTRA_CA_CERTS = $CertificadoRaizCA }
-    Push-Location $App
-    try {
-        & $NodeExe $NpmCli ci --omit=dev --no-audit --no-fund --loglevel=error
-        if ($LASTEXITCODE -ne 0) { Falla 'npm ci falló. Revise la conexión a internet (registry.npmjs.org) o use -Proxy.' }
-    } finally { Pop-Location }
-    Ok 'Librerías instaladas'
+    if (Test-Path (Join-Path $Origen 'node_modules\express\package.json')) {
+        Paso 'Copiando librerías (incluidas en el paquete)'
+        & robocopy.exe (Join-Path $Origen 'node_modules') (Join-Path $App 'node_modules') /MIR /NFL /NDL /NJH /NJS /NP /R:2 /W:2 | Out-Null
+        if ($LASTEXITCODE -ge 8) { Falla "No se pudieron copiar las librerías (robocopy $LASTEXITCODE)." }
+        Ok 'Librerías copiadas (sin descargar nada)'
+    } else {
+        Paso 'Instalando librerías (npm ci)'
+        if ($Proxy) { $env:HTTPS_PROXY = $Proxy; $env:HTTP_PROXY = $Proxy }
+        if ($CertificadoRaizCA) { $env:NODE_EXTRA_CA_CERTS = $CertificadoRaizCA }
+        Push-Location $App
+        try {
+            & $NodeExe $NpmCli ci --omit=dev --no-audit --no-fund --loglevel=error
+            if ($LASTEXITCODE -ne 0) { Falla 'npm ci falló. Revise la conexión a internet (registry.npmjs.org) o use -Proxy.' }
+        } finally { Pop-Location }
+        Ok 'Librerías instaladas'
+    }
 
     # -------------------------------------------------------------- 4. configuración
     Paso 'Configuración (.env)'
@@ -266,16 +304,17 @@ try {
     $valores['HOST'] = '127.0.0.1'
     $valores['APP_BASE_URL'] = "http://localhost:$Puerto"
     $valores['TRUST_PROXY'] = 'false'
+    $valores['BRAND'] = $Marca
     if (-not (Valor-Util $valores['SESSION_SECRET']) -or $valores['SESSION_SECRET'].Length -lt 32) { $valores['SESSION_SECRET'] = Nueva-Clave }
     $porDefecto = [ordered]@{ SESSION_MINUTES = '60'; SAC_OAUTH_PKCE = 'true'; MAX_FILE_MB = '20'; MAX_ROWS = '100000'; CHUNK_SIZE = '10000';
         NUMBER_LOCALE = 'es'; BLOCKED_VERSIONS = 'public.Actual'; VALIDATE_MEMBERS = 'true'; SAC_DEBUG = 'false' }
     foreach ($k in $porDefecto.Keys) { if (-not $valores.Contains($k)) { $valores[$k] = $porDefecto[$k] } }
     foreach ($k in @('AUDIT_FILE', 'TEMPLATES_FILE', 'COOKIE_SECURE')) { if ($valores.Contains($k)) { $valores.Remove($k) } }
 
-    $orden = @('PORT', 'HOST', 'APP_BASE_URL', 'TRUST_PROXY', 'SESSION_SECRET', 'SESSION_MINUTES', 'SAC_TENANT_URL', 'SAC_AUTHORIZE_URL',
+    $orden = @('BRAND', 'PORT', 'HOST', 'APP_BASE_URL', 'TRUST_PROXY', 'SESSION_SECRET', 'SESSION_MINUTES', 'SAC_TENANT_URL', 'SAC_AUTHORIZE_URL',
         'SAC_TOKEN_URL', 'SAC_CLIENT_ID', 'SAC_CLIENT_SECRET', 'SAC_OAUTH_SCOPE', 'SAC_OAUTH_PKCE', 'MAX_FILE_MB', 'MAX_ROWS', 'CHUNK_SIZE',
         'NUMBER_LOCALE', 'BLOCKED_VERSIONS', 'VALIDATE_MEMBERS', 'SAC_DEBUG')
-    $lineas = @("# Cargador de datos a SAC - configuración de $env:USERNAME ($(Get-Date -Format 'yyyy-MM-dd HH:mm'))")
+    $lineas = @("# Cargador de datos a SAC ($NombreMarca) - configuración de $env:USERNAME ($(Get-Date -Format 'yyyy-MM-dd HH:mm'))")
     foreach ($k in $orden) { if ($valores.Contains($k)) { $lineas += "$k=$($valores[$k])" } }
     foreach ($k in $valores.Keys) { if ($orden -notcontains $k) { $lineas += "$k=$($valores[$k])" } }
     Escribir-Utf8 $envPath (($lineas -join "`r`n") + "`r`n")
@@ -292,10 +331,11 @@ try {
 
     # -------------------------------------------------------------- 5. accesos directos
     Paso 'Accesos directos'
-    foreach ($f in @('Abrir-CargadorSAC.cmd', 'Detener-CargadorSAC.cmd', 'Desinstalar-CargadorSAC.cmd', 'CargadorSAC.ico')) {
+    foreach ($f in @('Abrir-CargadorSAC.cmd', 'Detener-CargadorSAC.cmd', 'Desinstalar-CargadorSAC.cmd')) {
         Copy-Item (Join-Path $Aqui $f) (Join-Path $Destino $f) -Force
     }
-    $cfg = @('@echo off', 'rem Generado por el instalador. No modificar.')
+    Copy-Item (Join-Path $App "brands\$Marca\icon.ico") (Join-Path $Destino 'CargadorSAC.ico') -Force
+    $cfg = @('@echo off', 'rem Generado por el instalador. No modificar.', "set ""TITULO=$Titulo""")
     if ($portatil) { $cfg += 'set "NODE_EXE=%~dp0node\node.exe"' } else { $cfg += "set ""NODE_EXE=$NodeExe""" }
     $cfg += "set ""PUERTO=$Puerto"""
     if ($Proxy) { $cfg += @('set "NODE_USE_ENV_PROXY=1"', "set ""HTTPS_PROXY=$Proxy""", "set ""HTTP_PROXY=$Proxy""", 'set "NO_PROXY=127.0.0.1,localhost"') }
@@ -317,10 +357,10 @@ try {
     $menu = Join-Path ([Environment]::GetFolderPath('Programs')) $Titulo
     New-Item -ItemType Directory -Force -Path $menu | Out-Null
     $abrir = Join-Path $Destino 'Abrir-CargadorSAC.cmd'
-    Crear-Acceso (Join-Path $escritorio "$Titulo.lnk") $abrir 'Abre el Cargador de datos a SAC de Ciudad Limpia' 7
-    Crear-Acceso (Join-Path $menu "$Titulo.lnk") $abrir 'Abre el Cargador de datos a SAC de Ciudad Limpia' 7
-    Crear-Acceso (Join-Path $menu 'Detener Cargador de datos a SAC.lnk') (Join-Path $Destino 'Detener-CargadorSAC.cmd') 'Cierra el Cargador de datos a SAC' 1
-    Crear-Acceso (Join-Path $menu 'Desinstalar Cargador de datos a SAC.lnk') (Join-Path $Destino 'Desinstalar-CargadorSAC.cmd') 'Quita el Cargador de datos a SAC' 1
+    Crear-Acceso (Join-Path $escritorio "$Titulo.lnk") $abrir "Abre el Cargador de datos a SAC de $NombreMarca" 7
+    Crear-Acceso (Join-Path $menu "$Titulo.lnk") $abrir "Abre el Cargador de datos a SAC de $NombreMarca" 7
+    Crear-Acceso (Join-Path $menu "Detener $Titulo.lnk") (Join-Path $Destino 'Detener-CargadorSAC.cmd') 'Cierra el Cargador de datos a SAC' 1
+    Crear-Acceso (Join-Path $menu "Desinstalar $Titulo.lnk") (Join-Path $Destino 'Desinstalar-CargadorSAC.cmd') 'Quita el Cargador de datos a SAC' 1
     Ok "Escritorio y menú Inicio: '$Titulo'"
 
     # -------------------------------------------------------------- 6. prueba

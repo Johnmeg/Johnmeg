@@ -1,0 +1,18 @@
+{
+  "_ayuda": "Textos e identidad visual de la marca (fanalca.com). Se elige con BRAND=fanalca en el .env.",
+  "name": "Fanalca",
+  "appName": "Carga de datos a SAC",
+  "utilLabel": "Planeación financiera · SAP Analytics Cloud",
+  "kicker": "Planeación financiera",
+  "heroTitle": "Carga de datos a los modelos de planeación",
+  "heroText": "Valide su archivo de Excel o plano y cárguelo a SAP Analytics Cloud con su propio usuario.",
+  "footer": "Fanalca · Planeación financiera",
+  "logoWidth": 186,
+  "logoHeight": 38,
+  "templates": "templates.json",
+  "installer": {
+    "folder": "CargadorSAC-Fanalca",
+    "shortcut": "Cargador de datos a SAC - Fanalca",
+    "port": 3001
+  }
+}

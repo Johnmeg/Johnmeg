@@ -9,6 +9,15 @@ Aplicación web (Node.js) para que los usuarios de planeación carguen archivos 
 
 Usa el **Data Import API** de SAC (`/api/v1/dataimport`) para escribir y el **Data Export API** (`/api/v1/dataexport`) para leer los maestros de las dimensiones.
 
+**Varias empresas, un mismo código.** La variable `BRAND` del `.env` elige la empresa: nombre, logo, colores y modelos de SAC.
+
+| `BRAND` | Empresa | Identidad visual | Modelos |
+|---|---|---|---|
+| `ciudadlimpia` (por defecto) | Ciudad Limpia | ciudadlimpia.com: verdes, botones redondeados | `config/templates.json` |
+| `fanalca` | Fanalca | fanalca.com: azul marino #071D49, azul #005EB8, franja azul–cian, títulos livianos | `brands/fanalca/templates.json` |
+
+Cada marca vive en `brands/<marca>/`: `brand.json` (textos, carpeta y puerto del instalador), `theme.css` (colores), `img/` (logos y favicon), `icon.ico` (ícono de Windows) y el catálogo de modelos.
+
 ---
 
 ## 1. Flujo
@@ -95,10 +104,10 @@ npm start                 # http://localhost:3000
 npm run demo
 ```
 
-Levanta un **SAC simulado** (login OAuth, Data Import y Data Export API) y la aplicación en `http://localhost:3000`.
+Levanta un **SAC simulado** (login OAuth, Data Import y Data Export API) y la aplicación en `http://localhost:3000`. Para ver la versión de Fanalca: `BRAND=fanalca npm run demo` (en Windows: `set BRAND=fanalca` y luego `npm run demo`).
 
 - Usuarios de prueba: `ana` / `demo` (puede cargar) y `luis` / `demo` (sin permiso de escritura).
-- Hay archivos de ejemplo en `samples/` para Gastos, Ingreso y EEFF: válidos y con errores a propósito. Se regeneran con `node scripts/make-samples.js`. Los códigos de miembros son los del simulador; en SAC real use sus códigos.
+- Hay archivos de ejemplo en `samples/` (Ciudad Limpia) y `samples/fanalca/` (Fanalca) para Gastos, Ingresos y EEFF: válidos y con errores a propósito. Se regeneran con `node scripts/make-samples.js`. Los códigos de miembros son los del simulador; en SAC real use sus códigos.
 
 ### Pruebas
 
@@ -126,6 +135,15 @@ La versión se elige en pantalla. Si el archivo trae una columna `Version`, debe
 | Gastos Ciudad Limpia | Modelo Gastos Ciudad Limpia | `Sociedad_CL`, `Cecos_CL`, `Cebes_CL`, `Cuentas_Egresos_CL`, `Auditoria_CL`, `Moneda_CL` + periodos |
 | Ingreso Ciudad Limpia | Modelo Ingreso Ciudad Limpia | `Sociedad_CL`, `Cebes_CL`, `Ratio_CL`, `Auditoria_CL`, `Moneda_CL` + periodos. `Cliente` y `Regional` son opcionales: si no vienen, se carga `#`. Permite *Borrar y reemplazar* |
 | EEFF Ciudad Limpia | Modelo EEFF Ciudad Limpia | `Sociedad_CL`, `Cuentas_EF_CL`, `Cebes_CL`, `Cecos_CL`, `Auditoria_CL`, `Moneda_CL` + periodos |
+| Otro modelo | Se elige de la lista de modelos del usuario | Las dimensiones de ese modelo + periodos |
+
+**Fanalca** (`BRAND=fanalca`, `brands/fanalca/templates.json`):
+
+| Carga a | Modelo en SAC (ID) | Columnas del archivo |
+|---|---|---|
+| Ingresos Fanalca | Modelo Ingresos FANALCA (`Couh7ojg5e54rh2d4udijq6o83k`) | `Sociedades`, `Cebes`, `Ratio`, `Auditoria`, `Moneda` + periodos. `Clientes` y `Referencias` son opcionales (si no vienen se carga `#`). Permite *Borrar y reemplazar* (alcance: Version, Date, Sociedades, Auditoria) |
+| Gastos Fanalca | Modelo Gastos FANALCA (`Cunejii8r2d7vr4ldq2ousgfg7f`) | `Sociedades`, `Cecos`, `Cebes`, `Cuentas_Egresos`, `Auditoria`, `Moneda` + periodos |
+| EEFF Fanalca | Modelo EEFF FANALCA (`C2kgen7fqc13vleoibl06hk4j7o`) | `Sociedades`, `Cuentas_EF`, `Cebes`, `Auditoria`, `Moneda` + periodos |
 | Otro modelo | Se elige de la lista de modelos del usuario | Las dimensiones de ese modelo + periodos |
 
 El modelo se busca por su **ID**, tomado de la URL del Modeler, y si ese ID no aparece, por su **nombre**. Las columnas `Total`, `Observaciones` y `Comentarios` se ignoran con una advertencia. Cualquier otra columna desconocida es un error, porque puede ser un mes o una dimensión mal escrita.
@@ -187,8 +205,11 @@ src/numbers.js          números es-CO / en
 src/periods.js          periodos → YYYYMM
 src/meta.js             metadata del modelo
 src/config.js, audit.js configuración y auditoría
+src/brand.js            marca (BRAND): textos, logos, colores y modelos
 public/                 interfaz (HTML/CSS/JS sin dependencias)
+brands/                 una carpeta por empresa (ciudadlimpia, fanalca)
 config/templates.json   modelos de Ciudad Limpia (Gastos, Ingreso, EEFF) y otro modelo
+deploy/windows-usuario/ instalador para el computador del usuario (ZIP y .exe)
 test/                   pruebas y SAC simulado
 samples/                archivos de ejemplo
 ```

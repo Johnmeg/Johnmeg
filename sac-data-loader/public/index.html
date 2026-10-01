@@ -3,15 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Carga de datos a SAC · Ciudad Limpia</title>
-  <link rel="icon" type="image/png" href="img/logo-ciudad-limpia.png">
+  <title>{{appName}} · {{name}}</title>
+  <link rel="icon" type="image/png" href="brand/img/favicon.png">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="brand/theme.css">
   <script src="app.js" defer></script>
 </head>
-<body>
+<body class="brand-{{id}}">
   <div class="utilbar">
     <div class="wrap utilbar-inner">
-      <span class="util-label">Planeación financiera · SAP Analytics Cloud</span>
+      <span class="util-label">{{utilLabel}}</span>
       <div class="user" id="userBox" hidden>
         <span class="avatar" id="userInitials" aria-hidden="true"></span>
         <div class="user-text">
@@ -25,19 +26,19 @@
 
   <header class="topbar">
     <div class="wrap topbar-inner">
-      <a class="brand" href="/" aria-label="Ciudad Limpia · Carga de datos a SAC">
-        <img class="logo logo-color" src="img/logo-ciudad-limpia.png" alt="Ciudad Limpia" width="176" height="54">
-        <img class="logo logo-white" src="img/logo-ciudad-limpia-blanco.png" alt="" width="176" height="54">
+      <a class="brand" href="/" aria-label="{{name}} · {{appName}}">
+        <img class="logo logo-color" src="brand/img/logo.png" alt="{{name}}" width="{{logoWidth}}" height="{{logoHeight}}">
+        <img class="logo logo-white" src="brand/img/logo-blanco.png" alt="{{name}}" width="{{logoWidth}}" height="{{logoHeight}}">
       </a>
-      <span class="app-name">Carga de datos a SAC</span>
+      <span class="app-name">{{appName}}</span>
     </div>
   </header>
 
   <section class="hero">
     <div class="wrap">
-      <p class="kicker">Planeación financiera</p>
-      <h1 class="hero-title">Carga de datos a los modelos de planeación</h1>
-      <p class="hero-text">Valide su archivo de Excel o plano y cárguelo a SAP Analytics Cloud con su propio usuario.</p>
+      <p class="kicker">{{kicker}}</p>
+      <h1 class="hero-title">{{heroTitle}}</h1>
+      <p class="hero-text">{{heroText}}</p>
     </div>
   </section>
 
@@ -187,7 +188,7 @@
 
   <footer class="footer">
     <div class="wrap">
-      <span>Ciudad Limpia · Planeación financiera</span>
+      <span>{{footer}}</span>
       <span>Los datos se cargan con su usuario de SAP Analytics Cloud</span>
     </div>
   </footer>

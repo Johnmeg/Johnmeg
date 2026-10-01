@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const session = require('express-session');
@@ -12,6 +13,7 @@ const { parseFile, ParseError, ALLOWED_EXT } = require('./parser');
 const { buildMeta, ConfigError } = require('./meta');
 const { validate, norm } = require('./validator');
 const loader = require('./loader');
+const { loadBrand, renderIndex } = require('./brand');
 
 // Servidor web: inicio de sesión OAuth por usuario, validación local del
 // archivo, validación en SAC y carga (Data Import API) en dos pasos.
@@ -67,7 +69,15 @@ function createApp(cfg, { audit = () => {}, logger = console } = {}) {
   }));
 
   app.use(express.json({ limit: '100kb' }));
-  app.use(express.static(path.join(__dirname, '..', 'public'), { index: 'index.html' }));
+
+  // Página principal con los textos de la marca; logos y colores en /brand/
+  const brand = cfg.brand || loadBrand();
+  const publicDir = path.join(__dirname, '..', 'public');
+  const indexHtml = renderIndex(fs.readFileSync(path.join(publicDir, 'index.html'), 'utf8'), brand);
+  app.get(['/', '/index.html'], (req, res) => res.type('html').send(indexHtml));
+  app.get('/brand/theme.css', (req, res) => res.type('css').sendFile(path.join(brand.dir, 'theme.css')));
+  app.use('/brand/img', express.static(path.join(brand.dir, 'img'), { index: false }));
+  app.use(express.static(publicDir, { index: false }));
 
   // Limpieza periódica de sesiones de SAC y archivos validados vencidos
   const sweeper = setInterval(() => {

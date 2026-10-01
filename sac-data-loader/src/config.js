@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { loadBrand } = require('./brand');
 
 // Carga la configuración desde variables de entorno (.env) y el catálogo de
 // plantillas (config/templates.json). Falla al iniciar si falta algo esencial.
@@ -46,7 +47,9 @@ function loadConfig(env = process.env) {
   if (env === process.env) loadDotEnv();
   const port = Number(env.PORT || 3000);
   const baseUrl = String(env.APP_BASE_URL || `http://localhost:${port}`).replace(/\/+$/, '');
+  const brand = loadBrand(env.BRAND);
   const cfg = {
+    brand,
     port,
     host: env.HOST || undefined, // 127.0.0.1 = sólo accesible desde el proxy del mismo servidor
     baseUrl,
@@ -70,7 +73,7 @@ function loadConfig(env = process.env) {
     validateMembers: env.VALIDATE_MEMBERS !== 'false',
     trustProxy: env.TRUST_PROXY === 'true',
     auditFile: env.AUDIT_FILE || path.join(__dirname, '..', 'logs', 'audit.log'),
-    templatesFile: env.TEMPLATES_FILE || path.join(__dirname, '..', 'config', 'templates.json'),
+    templatesFile: env.TEMPLATES_FILE || brand.templatesFile || path.join(__dirname, '..', 'config', 'templates.json'),
   };
 
   const missing = [];
