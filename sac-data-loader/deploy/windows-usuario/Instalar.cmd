@@ -4,6 +4,6 @@ rem Doble clic. No requiere permisos de administrador.
 setlocal
 set "PS1=%~dp0instalador\Instalar-CargadorSAC-Usuario.ps1"
 if not exist "%PS1%" set "PS1=%~dp0Instalar-CargadorSAC-Usuario.ps1"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PS1%" %*
+powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File "%PS1%" %*
 echo.
 pause

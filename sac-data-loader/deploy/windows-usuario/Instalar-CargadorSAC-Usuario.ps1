@@ -90,6 +90,105 @@ function Leer-Secreto([string]$pregunta) {
         Aviso 'El valor no puede estar vacío.'
     }
 }
+# Datos del cliente OAuth de SAC en una ventana de Windows (se puede pegar con
+# Ctrl+V o clic derecho). Devuelve $false si no hay interfaz gráfica disponible.
+$CamposSac = @(
+    @{ K = 'SAC_TENANT_URL'; T = 'URL del tenant de SAC'; P = '^https://[^/\s]+/?$'; E = 'https://fanalca-clpriv-sac.us21.analytics.cloud.sap' },
+    @{ K = 'SAC_AUTHORIZE_URL'; T = 'Authorization URL'; P = '^https://\S+/oauth/authorize$'; E = 'https://<subdominio>.authentication.us21.hana.ondemand.com/oauth/authorize' },
+    @{ K = 'SAC_TOKEN_URL'; T = 'Token URL'; P = '^https://\S+/oauth/token$'; E = 'https://<subdominio>.authentication.us21.hana.ondemand.com/oauth/token' },
+    @{ K = 'SAC_CLIENT_ID'; T = 'OAuth Client ID'; P = '^\S+$'; E = '' },
+    @{ K = 'SAC_CLIENT_SECRET'; T = 'Secret'; P = '^\S+$'; E = ''; S = $true }
+)
+function Limpiar-Valor($v) { return ([string]$v).Trim().Trim('"', "'").Trim() }
+function Pedir-DatosSac-Ventana($valores) {
+    try {
+        Add-Type -AssemblyName System.Windows.Forms, System.Drawing -ErrorAction Stop
+        [Windows.Forms.Application]::EnableVisualStyles()
+    } catch { return $false }
+
+    $f = New-Object Windows.Forms.Form
+    $f.Text = "Cargador de datos a SAC - $NombreMarca"
+    $f.StartPosition = 'CenterScreen'
+    $f.FormBorderStyle = 'FixedDialog'
+    $f.MaximizeBox = $false
+    $f.MinimizeBox = $false
+    $f.TopMost = $true
+    $f.Font = New-Object Drawing.Font('Segoe UI', 10)
+    $f.ClientSize = New-Object Drawing.Size(640, 470)
+
+    $intro = New-Object Windows.Forms.Label
+    $intro.Text = "Pegue los datos del cliente OAuth de SAC (Ctrl+V o clic derecho > Pegar).`r`n" +
+        "La Redirect URI del cliente debe ser: http://localhost:$Puerto/auth/callback"
+    $intro.Location = New-Object Drawing.Point(16, 12)
+    $intro.Size = New-Object Drawing.Size(608, 44)
+    $f.Controls.Add($intro)
+
+    $cajas = @{}
+    $y = 64
+    foreach ($c in $CamposSac) {
+        $l = New-Object Windows.Forms.Label
+        $l.Text = $c.T
+        $l.Location = New-Object Drawing.Point(16, $y)
+        $l.Size = New-Object Drawing.Size(608, 20)
+        $f.Controls.Add($l)
+        $t = New-Object Windows.Forms.TextBox
+        $t.Location = New-Object Drawing.Point(16, ($y + 22))
+        $t.Size = New-Object Drawing.Size(608, 26)
+        if ($c.S) { $t.UseSystemPasswordChar = $true }
+        $actual = $valores[$c.K]
+        if (Valor-Util $actual) { $t.Text = $actual } elseif ($c.K -eq 'SAC_TENANT_URL') { $t.Text = $c.E }
+        $f.Controls.Add($t)
+        $cajas[$c.K] = $t
+        if ($c.E -and $c.K -ne 'SAC_TENANT_URL') {
+            $e = New-Object Windows.Forms.Label
+            $e.Text = "Ejemplo: $($c.E)"
+            $e.ForeColor = [Drawing.Color]::Gray
+            $e.Font = New-Object Drawing.Font('Segoe UI', 8)
+            $e.Location = New-Object Drawing.Point(16, ($y + 50))
+            $e.Size = New-Object Drawing.Size(608, 16)
+            $f.Controls.Add($e)
+            $y += 18
+        }
+        $y += 60
+    }
+
+    $ok = New-Object Windows.Forms.Button
+    $ok.Text = 'Aceptar'
+    $ok.Size = New-Object Drawing.Size(110, 34)
+    $ok.Location = New-Object Drawing.Point(398, ($y + 6))
+    $cancel = New-Object Windows.Forms.Button
+    $cancel.Text = 'Cancelar'
+    $cancel.Size = New-Object Drawing.Size(110, 34)
+    $cancel.Location = New-Object Drawing.Point(514, ($y + 6))
+    $cancel.DialogResult = [Windows.Forms.DialogResult]::Cancel
+    $f.Controls.Add($ok)
+    $f.Controls.Add($cancel)
+    $f.AcceptButton = $ok
+    $f.CancelButton = $cancel
+    $f.ClientSize = New-Object Drawing.Size(640, ($y + 52))
+
+    $ok.Add_Click({
+        foreach ($c in $CamposSac) {
+            $v = Limpiar-Valor $cajas[$c.K].Text
+            if ($v -notmatch $c.P -or $v -match '[<>]') {
+                [Windows.Forms.MessageBox]::Show($f, "Revise el campo '$($c.T)'.", 'Dato no válido', 'OK', 'Warning') | Out-Null
+                $cajas[$c.K].Focus() | Out-Null
+                return
+            }
+        }
+        $f.DialogResult = [Windows.Forms.DialogResult]::OK
+        $f.Close()
+    })
+    $f.Add_Shown({ $f.Activate(); $cajas['SAC_AUTHORIZE_URL'].Focus() | Out-Null })
+
+    $r = $f.ShowDialog()
+    if ($r -ne [Windows.Forms.DialogResult]::OK) { $f.Dispose(); Falla 'Instalación cancelada: faltan los datos de SAC.' }
+    foreach ($c in $CamposSac) { $valores[$c.K] = Limpiar-Valor $cajas[$c.K].Text }
+    $valores['SAC_TENANT_URL'] = $valores['SAC_TENANT_URL'].TrimEnd('/')
+    $f.Dispose()
+    return $true
+}
+
 function Nueva-Clave {
     $bytes = New-Object byte[] 32
     $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
@@ -292,6 +391,15 @@ try {
     if ($faltan) {
         Write-Host '    Datos del cliente OAuth de SAC (pídalos al administrador de SAC):'
         Write-Host "    La Redirect URI del cliente debe incluir: http://localhost:$Puerto/auth/callback" -ForegroundColor Cyan
+        Write-Host '    Se abre una ventana para pegar los datos (puede quedar detrás de esta).' -ForegroundColor Cyan
+        if (Pedir-DatosSac-Ventana $valores) {
+            Ok 'Datos de SAC ingresados'
+            $faltan = @()
+        } else {
+            Aviso 'No se pudo abrir la ventana; escríbalos aquí.'
+        }
+    }
+    if ($faltan) {
         if ($faltan -contains 'SAC_TENANT_URL') { $valores['SAC_TENANT_URL'] = (Leer 'URL del tenant de SAC' '^https://[^/]+' 'https://fanalca-clpriv-sac.us21.analytics.cloud.sap').TrimEnd('/') }
         if ($faltan -contains 'SAC_AUTHORIZE_URL') { $valores['SAC_AUTHORIZE_URL'] = Leer 'Authorization URL' '^https://.+/oauth/authorize$' 'https://<subdominio>.authentication.us21.hana.ondemand.com/oauth/authorize' }
         if ($faltan -contains 'SAC_TOKEN_URL') { $valores['SAC_TOKEN_URL'] = Leer 'Token URL' '^https://.+/oauth/token$' 'https://<subdominio>.authentication.us21.hana.ondemand.com/oauth/token' }

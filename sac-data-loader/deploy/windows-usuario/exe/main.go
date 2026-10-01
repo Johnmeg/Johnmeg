@@ -106,7 +106,11 @@ func run() int {
 			shell = "pwsh"
 		}
 	}
-	args := append([]string{"-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script}, os.Args[1:]...)
+	args := []string{"-NoProfile", "-ExecutionPolicy", "Bypass"}
+	if runtime.GOOS == "windows" {
+		args = append(args, "-STA") // la ventana de datos de SAC (Windows Forms) requiere STA
+	}
+	args = append(append(args, "-File", script), os.Args[1:]...)
 	cmd := exec.Command(shell, args...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	if err := cmd.Run(); err != nil {
