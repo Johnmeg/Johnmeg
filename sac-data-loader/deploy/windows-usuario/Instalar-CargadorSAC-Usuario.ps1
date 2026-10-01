@@ -280,7 +280,15 @@ try {
         $viejo = (Get-Content $pidFile -Raw).Trim()
         $proc = $null
         if ($viejo -match '^\d+$') { $proc = Get-Process -Id ([int]$viejo) -ErrorAction SilentlyContinue }
-        if ($proc -and $proc.ProcessName -eq 'node') { Stop-Process -Id $viejo -Force; Start-Sleep -Seconds 1; Ok 'Versión anterior detenida' }
+        if ($proc -and $proc.ProcessName -eq 'node') {
+            try { Stop-Process -Id $viejo -Force -ErrorAction Stop }
+            catch {
+                Falla ('La versión anterior está abierta y no se pudo cerrar (probablemente se instaló "como administrador"). ' +
+                    'Reinicie el computador, o ciérrela en el Administrador de tareas (proceso node.exe), y vuelva a ejecutar el instalador ' +
+                    'SIN "Ejecutar como administrador".')
+            }
+            Start-Sleep -Seconds 1; Ok 'Versión anterior detenida'
+        }
         Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
     }
     if (Puerto-Ocupado $Puerto) {
