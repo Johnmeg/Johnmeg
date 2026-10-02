@@ -1,0 +1,207 @@
+{
+  "_ayuda": "Casos de prueba de data actions de Ciudad Limpia. Los modelos usan sus IDs reales; reemplace \"multiAction\" por el ID de la multi action que ejecuta su data action (<paquete>:<ID>) y ajuste los códigos de miembros. Los IDs t.DEMO:... sólo existen en el modo demostración.",
+  "casos": [
+    {
+      "id": "CL_PXQ_RESIDUOS",
+      "nombre": "P×Q residuos: Tarifa × Cantidad (Ingreso)",
+      "descripcion": "Data action CL_CALC_PXQ: ING_RES = TARI_RES × CANT_RESI. Parámetros del data action: versión, periodos, Sociedad y Cebes (elíjalos en el paso 2). Cambie la multi action por la real.",
+      "modelo": "Cdtrt4eesot3vn57g9a9ve57v5o",
+      "multiAction": "t.DEMO:CL_PXQ",
+      "version": "public.PRUEBAS",
+      "periodos": {
+        "desde": "202601",
+        "hasta": "202603"
+      },
+      "comun": {
+        "Auditoria_CL": "Input",
+        "Moneda_CL": "COP"
+      },
+      "parametros": [
+        {
+          "id": "TargetVersion",
+          "tipo": "version"
+        },
+        {
+          "id": "Periodo",
+          "tipo": "periodos"
+        },
+        {
+          "id": "Sociedad",
+          "tipo": "miembro",
+          "dimension": "Sociedad_CL",
+          "valor": [
+            "CL_BOG"
+          ]
+        },
+        {
+          "id": "Cebes",
+          "tipo": "miembro",
+          "dimension": "Cebes_CL",
+          "valor": [
+            "RECOLECCION",
+            "BARRIDO"
+          ]
+        }
+      ],
+      "entradas": [
+        {
+          "nombre": "TARIFA",
+          "fijo": {
+            "Ratio_CL": "TARI_RES"
+          },
+          "variar": {
+            "Sociedad_CL": "$Sociedad",
+            "Cebes_CL": "$Cebes"
+          },
+          "min": 40000,
+          "max": 60000,
+          "decimales": 0
+        },
+        {
+          "nombre": "CANTIDAD",
+          "fijo": {
+            "Ratio_CL": "CANT_RESI"
+          },
+          "variar": {
+            "Sociedad_CL": "$Sociedad",
+            "Cebes_CL": "$Cebes"
+          },
+          "min": 50,
+          "max": 500,
+          "decimales": 2
+        }
+      ],
+      "esperado": [
+        {
+          "nombre": "INGRESO",
+          "fijo": {
+            "Ratio_CL": "ING_RES"
+          },
+          "variar": {
+            "Sociedad_CL": "$Sociedad",
+            "Cebes_CL": "$Cebes"
+          },
+          "formula": "v('TARIFA') * v('CANTIDAD')"
+        }
+      ],
+      "tolerancia": 0.01
+    },
+    {
+      "id": "CL_DISTRIB_KM",
+      "nombre": "Distribución de gastos por kilómetros (Gastos)",
+      "descripcion": "Data action CL_DISTRIB_KM: los gastos de los Cecos EMISOR se reparten a los Cecos RECEPTOR según los km. Parámetros: versión, periodos y Sociedad. Elige al azar 2 emisores y 3 receptores por sus propiedades.",
+      "modelo": "Cl2fsrpi6n57id7iqdnck2m2p5t",
+      "multiAction": "t.DEMO:CL_DISTRIB_KM",
+      "version": "public.PRUEBAS",
+      "periodos": [
+        "202601",
+        "202602"
+      ],
+      "parametros": [
+        {
+          "id": "TargetVersion",
+          "tipo": "version"
+        },
+        {
+          "id": "Periodo",
+          "tipo": "periodos"
+        },
+        {
+          "id": "Sociedad",
+          "tipo": "miembro",
+          "dimension": "Sociedad_CL",
+          "valor": [
+            "CL_BOG"
+          ],
+          "multiple": false
+        }
+      ],
+      "entradas": [
+        {
+          "nombre": "GASTO",
+          "fijo": {
+            "Auditoria_CL": "Input",
+            "Moneda_CL": "COP"
+          },
+          "variar": {
+            "Cecos_CL": {
+              "aleatorio": 2,
+              "filtro": {
+                "EMISOR": "Y"
+              }
+            },
+            "Cuentas_Egresos_CL": [
+              "5105_SALARIOS",
+              "5210_COMBUSTIBLE"
+            ]
+          },
+          "min": 1000000,
+          "max": 9000000,
+          "decimales": 0
+        },
+        {
+          "nombre": "KM",
+          "fijo": {
+            "Cuentas_Egresos_CL": "KM_VEH",
+            "Auditoria_CL": "Script",
+            "Moneda_CL": "KILOMETROS"
+          },
+          "variar": {
+            "Cecos_CL": {
+              "aleatorio": 3,
+              "filtro": {
+                "RECEPTOR": "Y"
+              }
+            }
+          },
+          "min": 100,
+          "max": 3000,
+          "decimales": 0
+        }
+      ],
+      "esperado": [
+        {
+          "nombre": "RECIBIDO",
+          "fijo": {
+            "Auditoria_CL": "DIST_KM",
+            "Moneda_CL": "COP"
+          },
+          "variar": {
+            "Cecos_CL": "@KM",
+            "Cuentas_Egresos_CL": "@GASTO"
+          },
+          "formula": "sum('GASTO', { Cuentas_Egresos_CL: c.Cuentas_Egresos_CL }) * v('KM') / sum('KM')"
+        },
+        {
+          "nombre": "SALIDA",
+          "fijo": {
+            "Auditoria_CL": "DIST_KM",
+            "Moneda_CL": "COP"
+          },
+          "variar": {
+            "Cecos_CL": "@GASTO",
+            "Cuentas_Egresos_CL": "@GASTO"
+          },
+          "formula": "-v('GASTO')"
+        },
+        {
+          "nombre": "PROPORCION",
+          "fijo": {
+            "Cuentas_Egresos_CL": "PCT_KM",
+            "Auditoria_CL": "DIST_KM",
+            "Moneda_CL": "KILOMETROS"
+          },
+          "variar": {
+            "Cecos_CL": "@KM"
+          },
+          "formula": "v('KM') / sum('KM')",
+          "tolerancia": 1e-06
+        }
+      ],
+      "tolerancia": 0.01,
+      "comun": {
+        "Sociedad_CL": "$Sociedad"
+      }
+    }
+  ]
+}

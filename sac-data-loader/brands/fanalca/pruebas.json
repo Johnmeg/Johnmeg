@@ -1,0 +1,224 @@
+{
+  "_ayuda": "Casos de prueba de data actions de Fanalca. Los modelos usan sus IDs reales; reemplace \"multiAction\" por el ID de la multi action que ejecuta su data action (<paquete>:<ID>) y los códigos de miembros por los suyos. Los IDs t.DEMO:... sólo existen en el modo demostración.",
+  "plantilla": {
+    "id": "MI_PRUEBA",
+    "nombre": "Mi prueba de data action",
+    "descripcion": "Reemplace multi action, miembros y fórmula por los de su data action.",
+    "modelo": "Couh7ojg5e54rh2d4udijq6o83k",
+    "multiAction": "<paquete>:<ID de la multi action>",
+    "version": "public.PRUEBAS",
+    "periodos": {
+      "desde": "202601",
+      "hasta": "202603"
+    },
+    "comun": {
+      "Auditoria": "<auditoría de entrada>",
+      "Moneda": "<moneda>"
+    },
+    "parametros": [
+      {
+        "id": "TargetVersion",
+        "tipo": "version"
+      }
+    ],
+    "entradas": [
+      {
+        "nombre": "PRECIO",
+        "fijo": {
+          "Ratio": "<cuenta precio>"
+        },
+        "variar": {
+          "Sociedades": {
+            "aleatorio": 1
+          },
+          "Cebes": {
+            "aleatorio": 2
+          }
+        },
+        "min": 1000,
+        "max": 50000,
+        "decimales": 0
+      },
+      {
+        "nombre": "CANTIDAD",
+        "fijo": {
+          "Ratio": "<cuenta cantidad>"
+        },
+        "variar": {
+          "Sociedades": "@PRECIO",
+          "Cebes": "@PRECIO"
+        },
+        "min": 1,
+        "max": 500,
+        "decimales": 2
+      }
+    ],
+    "esperado": [
+      {
+        "nombre": "INGRESO",
+        "fijo": {
+          "Ratio": "<cuenta resultado>"
+        },
+        "variar": {
+          "Sociedades": "@PRECIO",
+          "Cebes": "@PRECIO"
+        },
+        "formula": "v('PRECIO') * v('CANTIDAD')"
+      }
+    ],
+    "tolerancia": 0.01
+  },
+  "casos": [
+    {
+      "id": "FN_PXQ_VENTAS",
+      "nombre": "P×Q ventas: Precio × Unidades (Ingresos)",
+      "descripcion": "Ejemplo: ING_VENTAS_NAL = PRECIO × UNIDADES. Parámetros: versión y Sociedad (paso 2); Cebes, Cliente y Referencia se eligen al azar. Ajuste multi action y códigos de Ratio a los de su modelo.",
+      "modelo": "Couh7ojg5e54rh2d4udijq6o83k",
+      "multiAction": "t.DEMO:FN_PXQ",
+      "version": "public.PRUEBAS",
+      "periodos": {
+        "desde": "202601",
+        "hasta": "202603"
+      },
+      "comun": {
+        "Auditoria": "PRESUPUESTO_EXCEL",
+        "Moneda": "COP",
+        "Sociedades": "$Sociedad"
+      },
+      "parametros": [
+        {
+          "id": "TargetVersion",
+          "tipo": "version"
+        },
+        {
+          "id": "Sociedad",
+          "tipo": "miembro",
+          "dimension": "Sociedades",
+          "valor": [
+            "FN_MOTOS"
+          ],
+          "multiple": false
+        }
+      ],
+      "entradas": [
+        {
+          "nombre": "PRECIO",
+          "fijo": {
+            "Ratio": "PRECIO"
+          },
+          "variar": {
+            "Cebes": {
+              "aleatorio": 2
+            },
+            "Clientes": {
+              "aleatorio": 1
+            },
+            "Referencias": {
+              "aleatorio": 2
+            }
+          },
+          "min": 5000000,
+          "max": 15000000,
+          "decimales": 0
+        },
+        {
+          "nombre": "UNIDADES",
+          "fijo": {
+            "Ratio": "UNIDADES"
+          },
+          "variar": {
+            "Cebes": "@PRECIO",
+            "Clientes": "@PRECIO",
+            "Referencias": "@PRECIO"
+          },
+          "min": 10,
+          "max": 2000,
+          "decimales": 0
+        }
+      ],
+      "esperado": [
+        {
+          "nombre": "VENTAS",
+          "fijo": {
+            "Ratio": "ING_VENTAS_NAL"
+          },
+          "variar": {
+            "Cebes": "@PRECIO",
+            "Clientes": "@PRECIO",
+            "Referencias": "@PRECIO"
+          },
+          "formula": "v('PRECIO') * v('UNIDADES')"
+        }
+      ],
+      "tolerancia": 0.01
+    },
+    {
+      "id": "FN_PXQ_CON_ERROR",
+      "nombre": "Demostración: data action con un error",
+      "descripcion": "Sólo para el modo demostración: la multi action t.DEMO:FN_PXQ_ERROR redondea el precio antes de multiplicar, así que la prueba debe fallar y mostrar las diferencias.",
+      "modelo": "Couh7ojg5e54rh2d4udijq6o83k",
+      "multiAction": "t.DEMO:FN_PXQ_ERROR",
+      "version": "public.PRUEBAS",
+      "periodos": [
+        "202601",
+        "202602"
+      ],
+      "comun": {
+        "Auditoria": "PRESUPUESTO_EXCEL",
+        "Moneda": "COP"
+      },
+      "parametros": [
+        {
+          "id": "TargetVersion",
+          "tipo": "version"
+        }
+      ],
+      "entradas": [
+        {
+          "nombre": "PRECIO",
+          "fijo": {
+            "Ratio": "PRECIO"
+          },
+          "variar": {
+            "Sociedades": {
+              "aleatorio": 1
+            },
+            "Cebes": {
+              "aleatorio": 2
+            }
+          },
+          "min": 5000000,
+          "max": 15000000,
+          "decimales": 0
+        },
+        {
+          "nombre": "UNIDADES",
+          "fijo": {
+            "Ratio": "UNIDADES"
+          },
+          "variar": {
+            "Sociedades": "@PRECIO",
+            "Cebes": "@PRECIO"
+          },
+          "min": 10,
+          "max": 2000,
+          "decimales": 0
+        }
+      ],
+      "esperado": [
+        {
+          "nombre": "VENTAS",
+          "fijo": {
+            "Ratio": "ING_VENTAS_NAL"
+          },
+          "variar": {
+            "Sociedades": "@PRECIO",
+            "Cebes": "@PRECIO"
+          },
+          "formula": "v('PRECIO') * v('UNIDADES')"
+        }
+      ],
+      "tolerancia": 0.01
+    }
+  ]
+}

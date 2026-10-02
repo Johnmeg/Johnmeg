@@ -1,0 +1,25 @@
+{
+  "_ayuda": "Textos e identidad visual de la marca. Se elige con la variable BRAND del .env (por defecto ciudadlimpia).",
+  "name": "Ciudad Limpia",
+  "appName": "Carga de datos a SAC",
+  "utilLabel": "Planeación financiera · SAP Analytics Cloud",
+  "kicker": "Planeación financiera",
+  "heroTitle": "Carga de datos a los modelos de planeación",
+  "heroText": "Valide su archivo de Excel o plano y cárguelo a SAP Analytics Cloud con su propio usuario.",
+  "footer": "Ciudad Limpia · Planeación financiera",
+  "logoWidth": 176,
+  "logoHeight": 54,
+  "templates": "../../config/templates.json",
+  "installer": {
+    "cargador": {
+      "folder": "CargadorSAC",
+      "shortcut": "Cargador de datos a SAC",
+      "port": 3000
+    },
+    "probador": {
+      "folder": "ProbadorDA",
+      "shortcut": "Probador de data actions",
+      "port": 3010
+    }
+  }
+}
