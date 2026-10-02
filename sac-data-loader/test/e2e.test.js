@@ -25,7 +25,7 @@ function listen(handler) {
   });
 }
 
-async function startStack({ validateMembers = true, tokenTtlSec = 3600 } = {}) {
+async function startStack({ validateMembers = true, tokenTtlSec = 3600, appMode = 'cargador' } = {}) {
   const mockHolder = {};
   const mockStarted = await listen((req, res, next) => mockHolder.app(req, res, next));
   const mock = createMockSac({ baseUrl: mockStarted.url, tokenTtlSec });
@@ -42,7 +42,7 @@ async function startStack({ validateMembers = true, tokenTtlSec = 3600 } = {}) {
     },
     sessionSecret: crypto.randomBytes(32).toString('hex'), cookieSecure: false, sessionMinutes: 60,
     maxFileMb: 1, maxRows: 1000, chunkSize: 7, numberLocale: 'es', blockedVersions: ['public.Actual'],
-    validateMembers, templates: loadTemplates(path.join(__dirname, '..', 'config', 'templates.json')),
+    appMode, validateMembers, templates: loadTemplates(path.join(__dirname, '..', 'config', 'templates.json')),
   };
   appHolder.app = createApp(cfg, { audit: (e) => events.push(e), logger: { error() {} } });
   return {
@@ -294,7 +294,7 @@ test('logout y token revocado cierran la sesión', async (t) => {
 });
 
 test('e2e: probador de data actions por la API (vista previa, ejecución, CSV y aislamiento)', async () => {
-  const stack = await startStack();
+  const stack = await startStack({ appMode: 'probador' });
   try {
     const { json, go } = await login(stack);
     const cat = await json('GET', '/api/tests/catalog');
@@ -302,8 +302,20 @@ test('e2e: probador de data actions por la API (vista previa, ejecución, CSV y 
     const caso = cat.body.casos.find((c) => c.id === 'CL_PXQ_RESIDUOS');
     assert.ok(caso);
 
-    const page = await go(`${stack.appUrl}/pruebas`);
-    assert.match(await page.text(), /Probador de data actions/);
+    const page = await go(`${stack.appUrl}/`);
+    const html = await page.text();
+    assert.match(html, /Probador de data actions/);
+    assert.doesNotMatch(html, /Cargar datos|uploadForm/);
+    assert.equal((await go(`${stack.appUrl}/probador.js`)).status, 200);
+    assert.equal((await go(`${stack.appUrl}/app.js`)).status, 404, 'no publica la interfaz del cargador');
+
+    const model = await json('GET', `/api/tests/model?modelo=${caso.modelo}`);
+    assert.equal(model.status, 200);
+    assert.ok(model.body.dimensions.includes('Cebes_CL'));
+    assert.deepEqual(model.body.versions.find((v) => v.id === 'public.Actual'), { id: 'public.Actual', blocked: true });
+    const members = await json('GET', `/api/tests/members?modelo=${caso.modelo}&dim=Sociedad_CL`);
+    assert.ok(members.body.members.some((m) => m.id === 'CL_BOG'));
+    assert.equal((await json('POST', '/api/validate', {})).status, 404, 'el probador no expone el cargador');
 
     const noConfirm = await json('POST', '/api/tests/run', { case: caso, seed: 9 });
     assert.equal(noConfirm.status, 400);
@@ -326,6 +338,7 @@ test('e2e: probador de data actions por la API (vista previa, ejecución, CSV y 
     }
     assert.equal(st.body.state, 'DONE');
     assert.deepEqual(st.body.reports.map((r) => [r.seed, r.state]), [[9, 'PASSED'], [10, 'PASSED']]);
+    assert.deepEqual(st.body.reports[0].parameterValues.find((p) => p.parameterId === 'Cebes').value.memberIds, ['RECOLECCION', 'BARRIDO']);
     const csv = await go(`${stack.appUrl}/api/tests/report/${run.body.runId}`);
     assert.match(csv.headers.get('content-type'), /text\/csv/);
     assert.match(await csv.text(), /CL_PXQ_RESIDUOS;10;INGRESO;/);
@@ -336,18 +349,17 @@ test('e2e: probador de data actions por la API (vista previa, ejecución, CSV y 
   } finally { stack.close(); }
 });
 
-test('e2e: el inicio de sesión desde el probador vuelve al probador', async () => {
-  const stack = await startStack();
+test('e2e: cargador y probador son aplicaciones separadas', async () => {
+  const loaderStack = await startStack();
+  const testerStack = await startStack({ appMode: 'probador' });
   try {
-    const go = browser();
-    const r1 = await go(`${stack.appUrl}/auth/login?next=/pruebas`);
-    const authUrl = new URL(r1.headers.get('location'));
-    const form = new URLSearchParams(Object.fromEntries(authUrl.searchParams));
-    form.set('username', 'ana'); form.set('password', 'demo');
-    const r2 = await go(`${stack.sacUrl}/oauth/authorize`, { method: 'POST', body: form });
-    const r3 = await go(r2.headers.get('location'));
-    assert.equal(r3.headers.get('location'), '/pruebas');
-    const evil = await go(`${stack.appUrl}/auth/login?next=https://otro.sitio`);
-    assert.equal(evil.status, 302); // se ignora: vuelve a "/"
-  } finally { stack.close(); }
+    const a = await login(loaderStack);
+    assert.equal((await a.json('GET', '/api/tests/catalog')).status, 404, 'el cargador no expone el probador');
+    assert.doesNotMatch(await (await a.go(`${loaderStack.appUrl}/`)).text(), /Probador de data actions/);
+    assert.equal((await a.go(`${loaderStack.appUrl}/probador.js`)).status, 404);
+    const r = await fetch(`${testerStack.appUrl}/auth/login`, { redirect: 'manual' });
+    assert.match(r.headers.get('set-cookie'), /^sacprobador\.sid=/, 'cookie propia (localhost comparte cookies entre puertos)');
+    const r2 = await fetch(`${loaderStack.appUrl}/auth/login`, { redirect: 'manual' });
+    assert.match(r2.headers.get('set-cookie'), /^sacloader\.sid=/);
+  } finally { loaderStack.close(); testerStack.close(); }
 });

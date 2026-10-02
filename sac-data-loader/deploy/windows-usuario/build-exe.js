@@ -7,6 +7,7 @@
 //
 //   node deploy/windows-usuario/build-exe.js fanalca
 //   node deploy/windows-usuario/build-exe.js ciudadlimpia
+//   node deploy/windows-usuario/build-exe.js fanalca --producto probador   (Probador de data actions)
 //
 // Requisitos (en el equipo que construye, Linux, macOS o Windows): Node.js 20+,
 // npm, Go 1.22+ y acceso a nodejs.org, registry.npmjs.org y proxy.golang.org.
@@ -39,10 +40,16 @@ const PERMITIDAS = ['SAC_TENANT_URL', 'SAC_AUTHORIZE_URL', 'SAC_TOKEN_URL', 'SAC
   'SAC_OAUTH_PKCE', 'MAX_FILE_MB', 'MAX_ROWS', 'CHUNK_SIZE', 'NUMBER_LOCALE', 'BLOCKED_VERSIONS', 'VALIDATE_MEMBERS'];
 
 const args = process.argv.slice(2);
-const marca = (args.find((a) => !a.startsWith('--')) || 'fanalca').toLowerCase();
+const marca = (args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--producto' && args[i - 1] !== '--config-empresa') || 'fanalca').toLowerCase();
 const iCfg = args.indexOf('--config-empresa');
 const configEmpresa = iCfg >= 0 ? args[iCfg + 1] : null;
 const liviano = args.includes('--liviano');
+const iProd = args.indexOf('--producto');
+const producto = iProd >= 0 ? String(args[iProd + 1] || '').toLowerCase() : 'cargador';
+const QUE_HACE = {
+  cargador: 'Instala en su computador la aplicación para validar y cargar archivos de Excel o\r\nCSV a los modelos de planeación de SAP Analytics Cloud. Entra con SU usuario de\r\nSAC: cada carga se hace con sus propios permisos.',
+  probador: 'Instala en su computador el Probador de data actions: genera datos aleatorios en\r\nuna versión de pruebas, ejecuta el data action (multi action) y compara el\r\nresultado de SAC con el valor esperado. Entra con SU usuario de SAC.',
+};
 
 const log = (m) => console.log(`» ${m}`);
 const run = (cmd, a, opts = {}) => execFileSync(cmd, a, { stdio: 'inherit', ...opts });
@@ -96,6 +103,8 @@ async function zipDir(dir, out) {
   const brandFile = path.join(ROOT, 'brands', marca, 'brand.json');
   if (!/^[a-z0-9-]+$/.test(marca) || !fs.existsSync(brandFile)) throw new Error(`La marca "${marca}" no existe (carpeta brands).`);
   const brand = JSON.parse(fs.readFileSync(brandFile, 'utf8'));
+  const prod = brand.installer?.[producto];
+  if (!prod) throw new Error(`Producto "${producto}" no válido: use --producto cargador o --producto probador.`);
   const nombre = brand.name.replace(/[^A-Za-z0-9]+/g, '');
   fs.mkdirSync(CACHE, { recursive: true });
 
@@ -106,7 +115,7 @@ async function zipDir(dir, out) {
   fs.mkdirSync(app, { recursive: true });
   fs.mkdirSync(ins, { recursive: true });
   try {
-    log(`Marca: ${brand.name}`);
+    log(`Marca: ${brand.name} · producto: ${producto}`);
     for (const f of ['server.js', 'package.json', 'package-lock.json', 'README.md', '.env.example']) fs.copyFileSync(path.join(ROOT, f), path.join(app, f));
     for (const d of ['src', 'public', 'config', 'brands', 'samples']) copy(path.join(ROOT, d), path.join(app, d));
 
@@ -122,10 +131,11 @@ async function zipDir(dir, out) {
       fs.copyFileSync(path.join(__dirname, f), path.join(ins, f));
     }
     fs.writeFileSync(path.join(ins, 'marca.txt'), marca);
+    fs.writeFileSync(path.join(ins, 'producto.txt'), producto);
     fs.copyFileSync(path.join(__dirname, 'Instalar.cmd'), path.join(pkg, 'Instalar.cmd'));
     const leame = fs.readFileSync(path.join(__dirname, 'LEAME.txt'), 'utf8')
-      .replaceAll('{{MARCA}}', brand.name.toUpperCase()).replaceAll('{{CARPETA}}', brand.installer.folder)
-      .replaceAll('{{ACCESO}}', brand.installer.shortcut).replaceAll('{{PUERTO}}', String(brand.installer.port));
+      .replaceAll('{{TITULO}}', prod.shortcut.toUpperCase()).replaceAll('{{QUE_HACE}}', QUE_HACE[producto])
+      .replaceAll('{{CARPETA}}', prod.folder).replaceAll('{{ACCESO}}', prod.shortcut).replaceAll('{{PUERTO}}', String(prod.port));
     fs.writeFileSync(path.join(pkg, 'LEAME.txt'), leame);
 
     if (configEmpresa) {
@@ -152,11 +162,12 @@ async function zipDir(dir, out) {
     log('Compilando el .exe...');
     fs.mkdirSync(DIST, { recursive: true });
     const sufijo = liviano ? '-liviano' : '';
-    const exe = path.join(DIST, `Instalar-CargadorSAC-${nombre}${sufijo}.exe`);
+    const base = producto === 'probador' ? 'ProbadorDA' : 'CargadorSAC';
+    const exe = path.join(DIST, `Instalar-${base}-${nombre}${sufijo}.exe`);
     run('go', ['build', '-trimpath', '-ldflags', '-s -w', '-o', exe, '.'], {
       cwd: EXE_DIR, env: { ...process.env, GOOS: 'windows', GOARCH: 'amd64', CGO_ENABLED: '0' },
     });
-    const zipOut = path.join(DIST, `CargadorSAC-${nombre}-Instalador${liviano ? '-liviano' : '-completo'}.zip`);
+    const zipOut = path.join(DIST, `${base}-${nombre}-Instalador${liviano ? '-liviano' : '-completo'}.zip`);
     fs.copyFileSync(payload, zipOut);
     fs.rmSync(payload);
     fs.rmSync(syso);

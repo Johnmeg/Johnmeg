@@ -1,12 +1,10 @@
-﻿CARGADOR DE DATOS A SAC - {{MARCA}}
+﻿{{TITULO}}
 Instalación en su computador
 ======================================
 
 Qué hace
 --------
-Instala en su computador la aplicación para validar y cargar archivos de Excel o
-CSV a los modelos de planeación de SAP Analytics Cloud. Entra con SU usuario de
-SAC: cada carga se hace con sus propios permisos.
+{{QUE_HACE}}
 
 No necesita permisos de administrador. Se instala en:
   %LOCALAPPDATA%\{{CARPETA}}

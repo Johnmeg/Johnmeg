@@ -15,12 +15,17 @@ const vm = require('vm');
 //   "version": "public.PRUEBAS",                 // versión de pruebas (se borra su alcance)
 //   "periodos": ["202601", "202602"] | { "desde": "202601", "hasta": "202603" },
 //   "comun": { "Sociedades": "FN_MOTOS", ... },  // miembros fijos de todas las celdas
-//   "parametros": [ ...parameterValues de la multi action... ],  // admite {{version}}
+//   "parametros": [                              // parámetros de la multi action / data action
+//     { "id": "TargetVersion", "tipo": "version" },
+//     { "id": "Periodo", "tipo": "periodos" },
+//     { "id": "Sociedad", "tipo": "miembro", "dimension": "Sociedades", "valor": ["FN_MOTOS"] },
+//     { "id": "Factor", "tipo": "numero", "valor": 1.05 } ],
 //   "entradas": [ { "nombre": "PRECIO", "fijo": {...}, "variar": {...}, "min": 1, "max": 9, "decimales": 2 } ],
 //   "esperado": [ { "nombre": "INGRESO", "fijo": {...}, "variar": {...}, "formula": "v('PRECIO') * v('UNIDADES')" } ]
 // }
 // "variar" admite por dimensión: una lista de miembros, { "aleatorio": n, "filtro": { "PROPIEDAD": "valor" } }
-// (n miembros tomados al azar del maestro del modelo) o "@ENTRADA" (los mismos miembros de esa entrada).
+// (n miembros tomados al azar del maestro del modelo), "@ENTRADA" (los mismos miembros de esa entrada)
+// o "$PARAMETRO" (los miembros elegidos en ese parámetro). En "comun" y "fijo" también se admite "$PARAMETRO".
 
 class CaseError extends Error {}
 
@@ -103,6 +108,65 @@ function compileFormula(src, where) {
   }
 }
 
+const PARAM_TYPES = new Set(['version', 'periodos', 'miembro', 'numero']);
+
+// Parámetros de la multi action. Formato declarativo (se eligen en pantalla) o el
+// formato de la API de SAP { "parameterId", "value" } (se envía tal cual).
+function normalizeParams(list) {
+  if (list === undefined) return [];
+  if (!Array.isArray(list)) throw new CaseError('"parametros" debe ser una lista.');
+  const ids = new Set();
+  return list.map((p, i) => {
+    const where = `parametros[${i}]`;
+    if (!isObj(p)) throw new CaseError(`${where} debe ser un objeto.`);
+    if (p.parameterId !== undefined) {
+      if (typeof p.parameterId !== 'string' || !p.parameterId) throw new CaseError(`${where}.parameterId no es válido.`);
+      ids.add(p.parameterId);
+      return { id: p.parameterId, tipo: 'api', raw: p };
+    }
+    const id = String(p.id || '').trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_.-]{0,60}$/.test(id)) throw new CaseError(`${where}.id es obligatorio (ID del parámetro en la multi action).`);
+    if (ids.has(id)) throw new CaseError(`El parámetro "${id}" está repetido.`);
+    ids.add(id);
+    const tipo = String(p.tipo || '');
+    if (!PARAM_TYPES.has(tipo)) throw new CaseError(`${where}.tipo debe ser version, periodos, miembro o numero.`);
+    const out = { id, tipo, etiqueta: String(p.etiqueta || id), jerarquia: p.jerarquia ? String(p.jerarquia) : null };
+    if (tipo === 'miembro') {
+      out.dimension = String(p.dimension || '').trim();
+      if (!out.dimension) throw new CaseError(`${where}: indique la "dimension" del parámetro ${id}.`);
+      out.multiple = p.multiple !== false;
+      const valor = p.valor === undefined || p.valor === null ? [] : (Array.isArray(p.valor) ? p.valor : [p.valor]);
+      if (valor.some((m) => typeof m !== 'string' || !m.trim())) throw new CaseError(`${where}.valor debe ser una lista de códigos de miembros.`);
+      if (!valor.length) throw new CaseError(`Seleccione al menos un miembro para el parámetro "${out.etiqueta}".`);
+      if (!out.multiple && valor.length > 1) throw new CaseError(`El parámetro "${out.etiqueta}" admite un solo miembro.`);
+      out.valor = [...new Set(valor)];
+    }
+    if (tipo === 'numero') {
+      out.valor = Number(p.valor);
+      if (p.valor === '' || p.valor === null || p.valor === undefined || !Number.isFinite(out.valor)) {
+        throw new CaseError(`Indique un número para el parámetro "${out.etiqueta}".`);
+      }
+    }
+    return out;
+  });
+}
+
+// Reemplaza "$PARAMETRO" por los miembros elegidos en ese parámetro.
+function applyParamRefs(obj, params, where, { single }) {
+  if (!isObj(obj)) return obj;
+  const out = {};
+  for (const [dim, v] of Object.entries(obj)) {
+    if (typeof v === 'string' && v.startsWith('$')) {
+      const p = params.find((x) => x.id === v.slice(1));
+      if (!p || p.tipo !== 'miembro') throw new CaseError(`${where}.${dim}: "${v}" no es un parámetro de tipo miembro.`);
+      if (p.dimension !== dim) throw new CaseError(`${where}.${dim}: el parámetro ${p.id} es de la dimensión ${p.dimension}.`);
+      if (single && p.valor.length !== 1) throw new CaseError(`${where}.${dim}: el parámetro ${p.id} tiene ${p.valor.length} miembros; aquí se necesita uno solo (use "variar").`);
+      out[dim] = single ? p.valor[0] : [...p.valor];
+    } else out[dim] = v;
+  }
+  return out;
+}
+
 // Valida la definición y devuelve una copia normalizada.
 function normalizeCase(raw) {
   if (!isObj(raw)) throw new CaseError('El caso de prueba debe ser un objeto JSON.');
@@ -123,9 +187,8 @@ function normalizeCase(raw) {
   if (!/^public\.\S+$/.test(c.version)) throw new CaseError('"version" debe ser una versión pública de pruebas, p. ej. public.PRUEBAS.');
   if (!Number.isFinite(c.tolerancia) || c.tolerancia < 0) throw new CaseError('"tolerancia" debe ser un número mayor o igual a 0.');
   c.periodos = expandPeriods(raw.periodos);
-  c.comun = checkMembers(raw.comun, 'comun');
-  c.parametros = raw.parametros === undefined ? [] : raw.parametros;
-  if (!Array.isArray(c.parametros)) throw new CaseError('"parametros" debe ser una lista (parameterValues de la multi action).');
+  c.parametros = normalizeParams(raw.parametros);
+  c.comun = checkMembers(applyParamRefs(raw.comun, c.parametros, 'comun', { single: true }), 'comun');
   c.limpieza = Array.isArray(raw.limpieza?.alcance) ? raw.limpieza.alcance.map(String) : null;
 
   const names = new Set();
@@ -136,7 +199,11 @@ function normalizeCase(raw) {
     if (!/^[A-Za-z_][A-Za-z0-9_]{0,40}$/.test(nombre)) throw new CaseError(`${where}.nombre es obligatorio (letras, números y _; sin espacios).`);
     if (names.has(nombre)) throw new CaseError(`El nombre "${nombre}" está repetido.`);
     names.add(nombre);
-    return { nombre, fijo: checkMembers(g.fijo, `${where}.fijo`), variar: checkVariar(g.variar, `${where}.variar`) };
+    return {
+      nombre,
+      fijo: checkMembers(applyParamRefs(g.fijo, c.parametros, `${where}.fijo`, { single: true }), `${where}.fijo`),
+      variar: checkVariar(applyParamRefs(g.variar, c.parametros, `${where}.variar`, { single: false }), `${where}.variar`),
+    };
   };
   if (!Array.isArray(raw.entradas) || !raw.entradas.length) throw new CaseError('"entradas" debe tener al menos un grupo de datos de entrada.');
   c.entradas = raw.entradas.map((g, i) => {
@@ -372,7 +439,20 @@ function summarize(groups) {
   };
 }
 
-// Reemplaza {{version}} y {{periodos}} en los parámetros de la multi action.
+// parameterValues para la API de multi actions a partir de los parámetros del caso.
+function parameterValues(c) {
+  return c.parametros.map((p) => {
+    switch (p.tipo) {
+      case 'version': return { parameterId: p.id, value: { memberIds: [c.version], hierarchyId: p.jerarquia } };
+      case 'periodos': return { parameterId: p.id, value: { memberIds: [...c.periodos], hierarchyId: p.jerarquia } };
+      case 'miembro': return { parameterId: p.id, value: { memberIds: [...p.valor], hierarchyId: p.jerarquia } };
+      case 'numero': return { parameterId: p.id, value: p.valor };
+      default: return fillParameters([p.raw], c)[0];
+    }
+  });
+}
+
+// Reemplaza {{version}} y {{periodos}} en los parámetros con formato de la API de SAP.
 function fillParameters(params, c) {
   const walk = (x) => {
     if (typeof x === 'string') {
@@ -388,5 +468,5 @@ function fillParameters(params, c) {
 
 module.exports = {
   CaseError, rng, expandPeriods, normalizeCase, resolveMembers, generateInputs, computeExpected,
-  toImportRecords, factFilter, compareGroup, summarize, fillParameters, cellsOf,
+  toImportRecords, factFilter, compareGroup, summarize, fillParameters, parameterValues, normalizeParams, cellsOf,
 };

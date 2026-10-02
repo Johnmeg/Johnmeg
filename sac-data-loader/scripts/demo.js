@@ -42,13 +42,14 @@ const cfg = {
   numberLocale: 'es',
   blockedVersions: ['public.Actual'],
   validateMembers: true,
+  appMode: process.env.APP_MODE === 'probador' ? 'probador' : 'cargador', // APP_MODE=probador npm run demo
   brand,
   templates: loadTemplates(brand.templatesFile || path.join(__dirname, '..', 'config', 'templates.json')),
 };
 
 const app = createApp(cfg, { audit: createAudit(path.join(__dirname, '..', 'logs', 'audit-demo.log')) });
 app.listen(APP_PORT, () => {
-  console.log(`Aplicación (${brand.name}) en ${appUrl}`);
+  console.log(`${cfg.appMode === 'probador' ? 'Probador de data actions' : 'Cargador'} (${brand.name}) en ${appUrl}`);
   console.log('Usuarios de prueba: ana / demo (puede cargar), luis / demo (sin permiso de escritura)');
   console.log('Archivos de ejemplo en ./samples');
 });

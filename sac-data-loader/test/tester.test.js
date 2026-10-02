@@ -51,6 +51,40 @@ test('probador: validación de la definición con mensajes claros', () => {
   assert.deepEqual(engine.expandPeriods({ desde: '202611', hasta: '202702' }), ['202611', '202612', '202701', '202702']);
 });
 
+test('probador: parámetros del data action y referencias $PARAMETRO', async () => {
+  const base = {
+    id: 'P', modelo: 'M', multiAction: 'p:X', version: 'public.PRUEBAS', periodos: ['202601', '202602'],
+    parametros: [
+      { id: 'TargetVersion', tipo: 'version' }, { id: 'Per', tipo: 'periodos', jerarquia: 'YHM' },
+      { id: 'Soc', tipo: 'miembro', dimension: 'Sociedad', valor: ['S1'], multiple: false },
+      { id: 'Ceb', tipo: 'miembro', dimension: 'Cebes', valor: ['C1', 'C2'] },
+      { id: 'Factor', tipo: 'numero', valor: '1.5' },
+      { parameterId: 'Libre', value: { memberIds: ['{{version}}'], hierarchyId: null } },
+    ],
+    comun: { Sociedad: '$Soc' },
+    entradas: [{ nombre: 'A', fijo: { Cuenta: 'X' }, variar: { Cebes: '$Ceb' }, min: 1, max: 2 }],
+    esperado: [{ nombre: 'B', fijo: { Cuenta: 'Y' }, variar: { Cebes: '@A' }, formula: "v('A') * 1.5" }],
+  };
+  const c = engine.normalizeCase(base);
+  assert.equal(c.comun.Sociedad, 'S1');
+  assert.deepEqual(c.entradas[0].variar.Cebes, ['C1', 'C2']);
+  assert.deepEqual(engine.parameterValues(c), [
+    { parameterId: 'TargetVersion', value: { memberIds: ['public.PRUEBAS'], hierarchyId: null } },
+    { parameterId: 'Per', value: { memberIds: ['202601', '202602'], hierarchyId: 'YHM' } },
+    { parameterId: 'Soc', value: { memberIds: ['S1'], hierarchyId: null } },
+    { parameterId: 'Ceb', value: { memberIds: ['C1', 'C2'], hierarchyId: null } },
+    { parameterId: 'Factor', value: 1.5 },
+    { parameterId: 'Libre', value: { memberIds: ['public.PRUEBAS'], hierarchyId: null } },
+  ]);
+  const bad = (patch, re) => assert.throws(() => engine.normalizeCase({ ...structuredClone(base), ...patch }), re);
+  bad({ parametros: [{ id: 'Soc', tipo: 'miembro', dimension: 'Sociedad', valor: [] }] }, /Seleccione al menos un miembro/);
+  bad({ parametros: [{ id: 'F', tipo: 'numero', valor: '' }] }, /Indique un número/);
+  bad({ parametros: [{ id: 'X', tipo: 'otro' }] }, /tipo debe ser/);
+  bad({ comun: { Sociedad: '$Ceb' } }, /es de la dimensión Cebes/);
+  bad({ comun: { Cebes: '$Ceb' } }, /se necesita uno solo/);
+  bad({ comun: { Sociedad: '$NoExiste' } }, /no es un parámetro/);
+});
+
 test('probador: fórmulas, filtro OData, tolerancia y parámetros', async () => {
   const c = engine.normalizeCase({
     id: 'T', modelo: 'M', multiAction: 'p:X', version: 'public.PRUEBAS', periodos: ['202601'],

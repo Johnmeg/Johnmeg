@@ -7,6 +7,7 @@
 
     powershell -ExecutionPolicy Bypass -File .\deploy\windows-usuario\Crear-Paquete.ps1 -Marca fanalca -ConfigEmpresa C:\ruta\.env
 
+  -Producto: cargador (por defecto) o probador (Probador de data actions).
   -Marca: ciudadlimpia (por defecto) o fanalca. Define nombre, colores, modelos, carpeta,
   accesos directos y puerto del paquete.
   Para el instalador .exe (todo incluido, sin descargas) use build-exe.js (ver DESPLIEGUE.md).
@@ -20,6 +21,8 @@
 param(
     [ValidatePattern('^[a-z0-9-]+$')]
     [string]$Marca = 'ciudadlimpia',
+    [ValidateSet('cargador', 'probador')]
+    [string]$Producto = 'cargador',
     [string]$Salida,
     [string]$ConfigEmpresa
 )
@@ -28,8 +31,14 @@ $raiz = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $jsonMarca = Join-Path $raiz "brands\$Marca\brand.json"
 if (-not (Test-Path $jsonMarca)) { throw "La marca '$Marca' no existe (carpeta brands)." }
 $infoMarca = [IO.File]::ReadAllText($jsonMarca, [Text.Encoding]::UTF8) | ConvertFrom-Json
+$prod = $infoMarca.installer.$Producto
+$queHace = @{
+    cargador = "Instala en su computador la aplicación para validar y cargar archivos de Excel o`r`nCSV a los modelos de planeación de SAP Analytics Cloud. Entra con SU usuario de`r`nSAC: cada carga se hace con sus propios permisos."
+    probador = "Instala en su computador el Probador de data actions: genera datos aleatorios en`r`nuna versión de pruebas, ejecuta el data action (multi action) y compara el`r`nresultado de SAC con el valor esperado. Entra con SU usuario de SAC."
+}
 if (-not $Salida) {
-    $nombre = if ($Marca -eq 'ciudadlimpia') { 'CargadorSAC-Instalador.zip' } else { "CargadorSAC-$($infoMarca.name)-Instalador.zip" }
+    $base = if ($Producto -eq 'probador') { 'ProbadorDA' } else { 'CargadorSAC' }
+    $nombre = if ($Marca -eq 'ciudadlimpia' -and $Producto -eq 'cargador') { 'CargadorSAC-Instalador.zip' } else { "$base-$($infoMarca.name)-Instalador.zip" }
     $Salida = Join-Path (Get-Location) $nombre
 }
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('paquete-' + [guid]::NewGuid().ToString('N'))
@@ -44,10 +53,11 @@ foreach ($f in @('Instalar-CargadorSAC-Usuario.ps1', 'Abrir-CargadorSAC.cmd', 'D
     Copy-Item (Join-Path $PSScriptRoot $f) $ins
 }
 [IO.File]::WriteAllText((Join-Path $ins 'marca.txt'), $Marca, [Text.Encoding]::ASCII)
+[IO.File]::WriteAllText((Join-Path $ins 'producto.txt'), $Producto, [Text.Encoding]::ASCII)
 Copy-Item (Join-Path $PSScriptRoot 'Instalar.cmd') $pkg
 $leame = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'LEAME.txt'), [Text.Encoding]::UTF8)
-$leame = $leame.Replace('{{MARCA}}', $infoMarca.name.ToUpper()).Replace('{{CARPETA}}', $infoMarca.installer.folder)
-$leame = $leame.Replace('{{ACCESO}}', $infoMarca.installer.shortcut).Replace('{{PUERTO}}', "$($infoMarca.installer.port)")
+$leame = $leame.Replace('{{TITULO}}', $prod.shortcut.ToUpper()).Replace('{{QUE_HACE}}', $queHace[$Producto]).Replace('{{CARPETA}}', $prod.folder)
+$leame = $leame.Replace('{{ACCESO}}', $prod.shortcut).Replace('{{PUERTO}}', "$($prod.port)")
 [IO.File]::WriteAllText((Join-Path $pkg 'LEAME.txt'), $leame, (New-Object Text.UTF8Encoding($true)))
 
 if ($ConfigEmpresa) {

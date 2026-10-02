@@ -288,12 +288,14 @@ Para pocos usuarios, o mientras no haya servidor, cada persona puede instalar la
 | Instalación con doble clic y acceso directo en el escritorio | Cada usuario debe reinstalar cuando haya una versión nueva |
 | Cada usuario usa sus propios permisos de SAC | La auditoría queda en cada computador (`app\logs\audit.log`) |
 
-Hay un paquete por empresa. Cada uno se instala en su propia carpeta y usa su propio puerto, así que un usuario puede tener las dos versiones:
+Hay un paquete por empresa y por aplicación (cargador o probador de data actions). Cada uno se instala en su propia carpeta y usa su propio puerto, así que un usuario puede tenerlas todas instaladas:
 
 | Empresa | Carpeta | Acceso directo | Dirección y Redirect URI |
 |---|---|---|---|
 | Ciudad Limpia | `%LOCALAPPDATA%\CargadorSAC` | *Cargador de datos a SAC* | `http://localhost:3000` → `http://localhost:3000/auth/callback` |
 | Fanalca | `%LOCALAPPDATA%\CargadorSAC-Fanalca` | *Cargador de datos a SAC - Fanalca* | `http://localhost:3001` → `http://localhost:3001/auth/callback` |
+| Ciudad Limpia · probador | `%LOCALAPPDATA%\ProbadorDA` | *Probador de data actions* | `http://localhost:3010` → `http://localhost:3010/auth/callback` |
+| Fanalca · probador | `%LOCALAPPDATA%\ProbadorDA-Fanalca` | *Probador de data actions - Fanalca* | `http://localhost:3011` → `http://localhost:3011/auth/callback` |
 
 ### E0. Instalador .exe con todo incluido (recomendado)
 Un solo archivo, por ejemplo **`Instalar-CargadorSAC-Fanalca.exe`** (unos 45 MB). Trae adentro la aplicación, sus librerías y Node.js portátil, así que **no descarga nada al instalar** y funciona en redes con proxy. No pide permisos de administrador.
@@ -302,6 +304,7 @@ Para generarlo se necesitan Node.js 20 o superior, npm y Go 1.22 o superior, en 
 ```
 node deploy/windows-usuario/build-exe.js fanalca
 node deploy/windows-usuario/build-exe.js ciudadlimpia
+node deploy/windows-usuario/build-exe.js fanalca --producto probador   # Probador de data actions
 ```
 Quedan en `dist/` el `.exe` y un ZIP con el mismo contenido (`CargadorSAC-Fanalca-Instalador-completo.zip`). Con `--liviano` se genera `Instalar-CargadorSAC-Fanalca-liviano.exe` (unos 11 MB): no trae Node.js, así que lo descarga de nodejs.org al instalar o usa el Node.js 20 o superior que ya tenga el equipo. Sirve cuando el archivo se envía por un canal con límite de tamaño. Con `--config-empresa C:\ruta\.env` incluye los datos de SAC, igual que `Crear-Paquete.ps1`. En ese caso comparta el `.exe` **solo con usuarios autorizados**, porque lleva el Secret.
 

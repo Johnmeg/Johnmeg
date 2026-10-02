@@ -48,7 +48,10 @@ function loadConfig(env = process.env) {
   const port = Number(env.PORT || 3000);
   const baseUrl = String(env.APP_BASE_URL || `http://localhost:${port}`).replace(/\/+$/, '');
   const brand = loadBrand(env.BRAND);
+  const appMode = String(env.APP_MODE || 'cargador').trim().toLowerCase();
+  if (!['cargador', 'probador'].includes(appMode)) throw new Error(`APP_MODE="${env.APP_MODE}" no es válido: use cargador o probador.`);
   const cfg = {
+    appMode,
     brand,
     port,
     host: env.HOST || undefined, // 127.0.0.1 = sólo accesible desde el proxy del mismo servidor

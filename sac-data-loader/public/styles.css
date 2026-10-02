@@ -268,9 +268,32 @@ td.value { font-family: ui-monospace, Consolas, monospace; overflow-wrap: anywhe
 .run-options { margin-top: 18px; }
 .inline { display: flex; gap: 8px; align-items: center; }
 .inline input { flex: 1; min-width: 0; }
-input[type="number"] {
+input[type="number"], input[type="month"], input[type="search"] {
   font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius);
-  background: var(--surface); color: var(--text); width: 100%;
+  background: var(--surface); color: var(--text); width: 100%; min-width: 0;
+}
+.form-grid { margin-top: 18px; }
+.inline .to { color: var(--muted); }
+.actions.left { justify-content: flex-start; }
+.params { display: grid; gap: 12px; }
+.param { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; background: var(--bg); display: grid; gap: 10px; min-width: 0; }
+.param-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) auto; gap: 8px; align-items: center; }
+.param-body { display: grid; gap: 8px; min-width: 0; }
+.param-line { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.param-line select { width: auto; min-width: 180px; max-width: 100%; }
+.param-id { font-weight: 700; color: var(--heading); }
+.picker { display: grid; gap: 6px; }
+.picker select[multiple] { padding: 4px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 10px; border-radius: var(--pill);
+  background: var(--primary-soft); color: var(--heading); font-size: 13px; font-weight: 600; max-width: 100%;
+}
+.chip span { overflow-wrap: anywhere; }
+.chip button { border: 0; background: none; color: inherit; cursor: pointer; font-size: 15px; line-height: 1; padding: 2px 6px; }
+pre.code {
+  font: 12px/1.5 ui-monospace, Consolas, monospace; background: var(--bg); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 10px; overflow: auto; max-height: 260px; color: var(--text);
 }
 .check { display: flex; gap: 8px; align-items: center; font-size: 14px; }
 .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
@@ -297,6 +320,8 @@ tr.sev-error td { background: var(--err-soft) !important; }
   .logo { width: calc(var(--logo-w, 176px) * .75); }
   .app-name { font-size: 16px; text-align: right; }
   .appnav a { font-size: 13px; padding: 4px 8px; }
+  .param-head { grid-template-columns: 1fr auto; }
+  .param-head select { grid-column: 1 / -1; grid-row: 2; }
   .hero { padding: 24px 0 28px; }
   .kicker { font-size: 20px; }
   .hero-title { font-size: 24px; }

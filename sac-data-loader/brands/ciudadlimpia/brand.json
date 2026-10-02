@@ -11,8 +11,15 @@
   "logoHeight": 54,
   "templates": "../../config/templates.json",
   "installer": {
-    "folder": "CargadorSAC",
-    "shortcut": "Cargador de datos a SAC",
-    "port": 3000
+    "cargador": {
+      "folder": "CargadorSAC",
+      "shortcut": "Cargador de datos a SAC",
+      "port": 3000
+    },
+    "probador": {
+      "folder": "ProbadorDA",
+      "shortcut": "Probador de data actions",
+      "port": 3010
+    }
   }
 }

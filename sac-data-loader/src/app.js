@@ -14,7 +14,6 @@ const { buildMeta, ConfigError } = require('./meta');
 const { validate, norm } = require('./validator');
 const loader = require('./loader');
 const { loadBrand, renderIndex } = require('./brand');
-const tester = require('./tester/runner');
 const { CaseError } = require('./tester/engine');
 
 // Servidor web: inicio de sesión OAuth por usuario, validación local del
@@ -29,6 +28,9 @@ const PREVIEW_ROWS = 20;
 
 function createApp(cfg, { audit = () => {}, logger = console } = {}) {
   const app = express();
+  // Dos aplicaciones separadas con el mismo código: 'cargador' (carga de archivos) y
+  // 'probador' (pruebas de data actions). Cada una corre en su propio puerto.
+  const mode = cfg.appMode === 'probador' ? 'probador' : 'cargador';
   const vault = new Map();   // vaultKey -> { tokens, user, sac: {csrf, cookies}, lastSeen, refreshing }
   const uploads = new Map(); // uploadId -> datos del archivo validado y del job
   const memberCache = new Map(); // `${modelId}|${dim}` -> { at, set }
@@ -57,7 +59,8 @@ function createApp(cfg, { audit = () => {}, logger = console } = {}) {
   const sessionStore = new session.MemoryStore();
   app.use(session({
     store: sessionStore,
-    name: 'sacloader.sid',
+    // Nombre distinto por aplicación: las cookies de localhost se comparten entre puertos
+    name: mode === 'probador' ? 'sacprobador.sid' : 'sacloader.sid',
     secret: cfg.sessionSecret,
     resave: false,
     saveUninitialized: false,
@@ -75,13 +78,14 @@ function createApp(cfg, { audit = () => {}, logger = console } = {}) {
   // Página principal con los textos de la marca; logos y colores en /brand/
   const brand = cfg.brand || loadBrand();
   const publicDir = path.join(__dirname, '..', 'public');
-  const indexHtml = renderIndex(fs.readFileSync(path.join(publicDir, 'index.html'), 'utf8'), brand);
-  const testsHtml = renderIndex(fs.readFileSync(path.join(publicDir, 'pruebas.html'), 'utf8'), brand);
+  const page = mode === 'probador' ? 'probador.html' : 'index.html';
+  const indexHtml = renderIndex(fs.readFileSync(path.join(publicDir, page), 'utf8'), brand);
   app.get(['/', '/index.html'], (req, res) => res.type('html').send(indexHtml));
-  app.get(['/pruebas', '/pruebas.html'], (req, res) => res.type('html').send(testsHtml));
   app.get('/brand/theme.css', (req, res) => res.type('css').sendFile(path.join(brand.dir, 'theme.css')));
   app.use('/brand/img', express.static(path.join(brand.dir, 'img'), { index: false }));
-  app.use(express.static(publicDir, { index: false }));
+  // Cada aplicación publica sólo sus propios archivos de interfaz
+  const assets = mode === 'probador' ? ['probador.js', 'styles.css'] : ['app.js', 'styles.css'];
+  app.get(assets.map((f) => `/${f}`), (req, res) => res.sendFile(path.join(publicDir, req.path.slice(1))));
 
   // Limpieza periódica de sesiones de SAC y archivos validados vencidos
   const sweeper = setInterval(() => {
@@ -95,7 +99,6 @@ function createApp(cfg, { audit = () => {}, logger = console } = {}) {
       }
     }
     for (const [k, m] of memberCache) if (now - m.at > MEMBER_TTL_MS) memberCache.delete(k);
-    for (const [k, r] of testRuns) if (r.state === 'DONE' && now - r.createdAt > 2 * 60 * 60 * 1000) testRuns.delete(k);
   }, 60 * 1000);
   sweeper.unref();
 
@@ -207,9 +210,7 @@ function createApp(cfg, { audit = () => {}, logger = console } = {}) {
   app.get('/auth/login', (req, res) => {
     const state = oauth.randomToken();
     const pkce = cfg.sac.usePkce ? oauth.pkcePair() : null;
-    // Página a la que se vuelve después del login (sólo rutas propias conocidas)
-    const next = req.query.next === '/pruebas' ? '/pruebas' : '/';
-    req.session.oauth = { state, verifier: pkce?.verifier || null, at: Date.now(), next };
+    req.session.oauth = { state, verifier: pkce?.verifier || null, at: Date.now() };
     res.redirect(oauth.buildAuthorizeUrl(cfg, { state, codeChallenge: pkce?.challenge }));
   });
 
@@ -228,14 +229,13 @@ function createApp(cfg, { audit = () => {}, logger = console } = {}) {
       return res.redirect(`/?error=${encodeURIComponent('SAC no aceptó el inicio de sesión. Verifique la configuración del cliente OAuth.')}`);
     }
     const user = oauth.userFromTokens(tokens);
-    const next = pending.next === '/pruebas' ? '/pruebas' : '/';
     // Nueva sesión tras autenticarse (evita fijación de sesión)
     await new Promise((resolve, reject) => req.session.regenerate((err) => (err ? reject(err) : resolve())));
     const vaultKey = oauth.randomToken();
     vault.set(vaultKey, { tokens, user, sac: { csrf: null, cookies: {} }, lastSeen: Date.now(), refreshing: null });
     req.session.vaultKey = vaultKey;
     audit({ event: 'LOGIN', user: user.id });
-    return res.redirect(next);
+    return res.redirect('/');
   }));
 
   app.post('/auth/logout', requireAjax, (req, res) => {
@@ -269,318 +269,245 @@ function createApp(cfg, { audit = () => {}, logger = console } = {}) {
     });
   });
 
-  // ------------------------------------------------------------ catálogos
-  app.get('/api/templates', requireAuth, (req, res) => {
-    res.json({ templates: cfg.templates.map(templateView) });
-  });
-
   app.get('/api/models', requireAuth, wrap(async (req, res) => {
     const models = await clientFor(req.auth).listModels();
     res.json({ models: models.sort((a, b) => a.name.localeCompare(b.name)) });
   }));
 
-  app.get('/api/versions', requireAuth, wrap(async (req, res) => {
-    const template = templates.get(String(req.query.template || ''));
-    if (!template) return res.status(400).json({ error: 'Plantilla desconocida.' });
-    const client = clientFor(req.auth);
-    const model = await resolveModel(client, template, String(req.query.modelId || ''));
-    const meta = buildMeta(await client.getMetadata(model.id), template);
-    const set = await membersOf(client, model.id, meta.versionColumn).catch(() => null);
-    const blocked = new Set(cfg.blockedVersions.map((v) => norm(v)));
-    const versions = set ? [...set].sort().map((id) => ({ id, blocked: blocked.has(norm(id)) })) : null;
-    // Columnas que debe traer el archivo (dimensiones del modelo menos versión y fecha)
-    const optional = new Set(Object.keys({ ...(template.defaultValues || {}), ...(template.fixedValues || {}) }));
-    const expectedColumns = meta.keys
-      .filter((k) => k !== meta.versionColumn && k !== meta.dateColumn)
-      .map((k) => ({ name: k, optional: optional.has(k) }));
-    return res.json({ model, versionColumn: meta.versionColumn, dateColumn: meta.dateColumn, measure: meta.measure, expectedColumns, versions });
-  }));
-
-  // ------------------------------------------------------------ validación local
-  const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: cfg.maxFileMb * 1024 * 1024, files: 1, fields: 10, fieldSize: 1024 },
-    fileFilter: (req, file, cb) => {
-      const ext = path.extname(file.originalname || '').toLowerCase();
-      if (!ALLOWED_EXT.has(ext) && ext !== '.xls') {
-        return cb(new ParseError('ARCH_FORMATO', `Extensión "${ext || 'sin extensión'}" no permitida. Use .xlsx, .xlsm, .csv o .txt.`));
-      }
-      return cb(null, true);
-    },
-  });
-
-  app.post('/api/validate', requireAjax, requireAuth, upload.single('file'), wrap(async (req, res) => {
-    const started = Date.now();
-    const template = templates.get(String(req.body.template || ''));
-    if (!template) return res.status(400).json({ error: 'Seleccione el modelo al que va a cargar.' });
-    if (!req.file) return res.status(400).json({ error: 'Adjunte el archivo a cargar.' });
-
-    const version = String(req.body.version || '').trim();
-    const importMethod = String(req.body.importMethod || 'Update');
-    const allowedMethods = template.importMethods || ['Update'];
-    if (!allowedMethods.includes(importMethod)) {
-      return res.status(400).json({ error: `El método "${importMethod}" no está habilitado para ${template.name}.` });
-    }
-
-    const client = clientFor(req.auth);
-    const model = await resolveModel(client, template, String(req.body.modelId || ''));
-    const meta = buildMeta(await client.getMetadata(model.id), template);
-    const grid = await parseFile({
-      filename: req.file.originalname, buffer: req.file.buffer, preferredSheet: template.sheet, maxRows: cfg.maxRows,
+  // ------------------------------------------------------------ cargador (sólo en la aplicación del cargador)
+  if (mode === 'cargador') {
+    // ------------------------------------------------------------ catálogos
+    app.get('/api/templates', requireAuth, (req, res) => {
+      res.json({ templates: cfg.templates.map(templateView) });
     });
 
-    // Miembros de cada dimensión (Data Export API) para validar códigos antes de enviar
-    const members = new Map();
-    const extraIssues = [];
-    if (grid.info?.warning) {
-      extraIssues.push({ severity: 'warning', code: 'ARCH_HOJA', title: 'Hoja leída', message: grid.info.warning });
-    }
-    if (cfg.validateMembers) {
-      const dims = meta.keys.filter((k) => k !== meta.dateColumn && k !== meta.measure);
-      const results = await Promise.all(dims.map((d) => membersOf(client, model.id, d)
-        .then((set) => ({ d, set }))
-        .catch((e) => ({ d, set: null, err: e }))));
-      const skipped = [];
-      for (const { d, set, err } of results) {
-        if (set) members.set(d, set);
-        else if (d !== meta.versionColumn) skipped.push(err ? `${d} (${err.status || 'error'})` : d);
-      }
-      if (skipped.length) {
-        extraIssues.push({
-          severity: 'warning', code: 'MIEMBROS_NO_VERIFICADOS', title: 'Miembros no verificados localmente',
-          message: `No se pudo leer el maestro de: ${skipped.join(', ')}. Esos códigos los validará SAC en el siguiente paso.`,
-        });
-      }
-    }
+    app.get('/api/versions', requireAuth, wrap(async (req, res) => {
+      const template = templates.get(String(req.query.template || ''));
+      if (!template) return res.status(400).json({ error: 'Plantilla desconocida.' });
+      const client = clientFor(req.auth);
+      const model = await resolveModel(client, template, String(req.query.modelId || ''));
+      const meta = buildMeta(await client.getMetadata(model.id), template);
+      const set = await membersOf(client, model.id, meta.versionColumn).catch(() => null);
+      const blocked = new Set(cfg.blockedVersions.map((v) => norm(v)));
+      const versions = set ? [...set].sort().map((id) => ({ id, blocked: blocked.has(norm(id)) })) : null;
+      // Columnas que debe traer el archivo (dimensiones del modelo menos versión y fecha)
+      const optional = new Set(Object.keys({ ...(template.defaultValues || {}), ...(template.fixedValues || {}) }));
+      const expectedColumns = meta.keys
+        .filter((k) => k !== meta.versionColumn && k !== meta.dateColumn)
+        .map((k) => ({ name: k, optional: optional.has(k) }));
+      return res.json({ model, versionColumn: meta.versionColumn, dateColumn: meta.dateColumn, measure: meta.measure, expectedColumns, versions });
+    }));
 
-    const result = validate({
-      grid, template, meta, members,
-      options: {
-        version, numberLocale: template.numberLocale || cfg.numberLocale,
-        maxRows: cfg.maxRows, blockedVersions: cfg.blockedVersions,
+    // ------------------------------------------------------------ validación local
+    const upload = multer({
+      storage: multer.memoryStorage(),
+      limits: { fileSize: cfg.maxFileMb * 1024 * 1024, files: 1, fields: 10, fieldSize: 1024 },
+      fileFilter: (req, file, cb) => {
+        const ext = path.extname(file.originalname || '').toLowerCase();
+        if (!ALLOWED_EXT.has(ext) && ext !== '.xls') {
+          return cb(new ParseError('ARCH_FORMATO', `Extensión "${ext || 'sin extensión'}" no permitida. Use .xlsx, .xlsm, .csv o .txt.`));
+        }
+        return cb(null, true);
       },
     });
 
-    const importType = version.toLowerCase().startsWith('private.') ? 'privateFactData' : (template.importType || 'factData');
-    const sha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
-    const uploadId = oauth.randomToken(18);
-    const issues = [...extraIssues, ...result.issues];
-    result.summary.warnings += extraIssues.length;
-    uploads.set(uploadId, {
-      uploadId, vaultKey: req.vaultKey, createdAt: Date.now(),
-      template, model, meta, importType, version, importMethod,
-      fileName: req.file.originalname, sha256,
-      ok: result.ok, records: result.ok ? result.records : [], issues, summary: result.summary, job: null,
-    });
+    app.post('/api/validate', requireAjax, requireAuth, upload.single('file'), wrap(async (req, res) => {
+      const started = Date.now();
+      const template = templates.get(String(req.body.template || ''));
+      if (!template) return res.status(400).json({ error: 'Seleccione el modelo al que va a cargar.' });
+      if (!req.file) return res.status(400).json({ error: 'Adjunte el archivo a cargar.' });
 
-    audit({
-      event: 'VALIDACION', user: req.auth.user.id, template: template.id, model: model.name, modelId: model.id,
-      version, importMethod, file: req.file.originalname, sha256, ok: result.ok,
-      records: result.records.length, errors: result.summary.errors, warnings: result.summary.warnings,
-      ms: Date.now() - started,
-    });
+      const version = String(req.body.version || '').trim();
+      const importMethod = String(req.body.importMethod || 'Update');
+      const allowedMethods = template.importMethods || ['Update'];
+      if (!allowedMethods.includes(importMethod)) {
+        return res.status(400).json({ error: `El método "${importMethod}" no está habilitado para ${template.name}.` });
+      }
 
-    return res.json({
-      uploadId, ok: result.ok,
-      model, importType, importMethod, version,
-      columns: [...meta.keys, meta.measure],
-      summary: { ...result.summary, fileName: req.file.originalname, sizeBytes: req.file.size, sha256 },
-      issues,
-      preview: result.records.slice(0, PREVIEW_ROWS),
-    });
-  }));
-
-  // Reporte de hallazgos en CSV (separador ";" y BOM para abrir directo en Excel es-CO)
-  app.get('/api/report/:uploadId', requireAuth, (req, res) => {
-    const u = getUpload(req, res);
-    if (!u) return;
-    const q = (v) => {
-      let s = v === null || v === undefined ? '' : String(v);
-      if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`; // evita inyección de fórmulas en Excel
-      return `"${s.replace(/"/g, '""')}"`;
-    };
-    const lines = [['Severidad', 'Código', 'Tipo', 'Fila', 'Columna', 'Valor', 'Detalle'].map(q).join(';')];
-    for (const i of u.issues) {
-      lines.push([i.severity === 'error' ? 'Error' : 'Advertencia', i.code, i.title, i.row, i.column, i.value, i.message].map(q).join(';'));
-    }
-    for (const r of u.job?.rejected || []) {
-      const { _REJECTION_REASON: reason, ...row } = r;
-      lines.push(['Error', 'RECHAZO_SAC', 'Fila rechazada por SAC', '', '', JSON.stringify(row), reason].map(q).join(';'));
-    }
-    const base = path.basename(u.fileName, path.extname(u.fileName)).replace(/[^\w.-]+/g, '_');
-    res.set('Content-Type', 'text/csv; charset=utf-8');
-    res.set('Content-Disposition', `attachment; filename="validacion_${base}.csv"`);
-    res.send(`﻿${lines.join('\r\n')}\r\n`);
-  });
-
-  // ------------------------------------------------------------ SAC: preparar (validar en SAC) y ejecutar
-  app.post('/api/sac/prepare', requireAjax, requireAuth, wrap(async (req, res) => {
-    const u = getUpload(req, res);
-    if (!u) return;
-    if (!u.ok) return res.status(409).json({ error: 'Corrija los errores de la validación local antes de continuar.' });
-    if (u.job && ['PREPARING', 'PREPARED', 'RUNNING', 'COMPLETED'].includes(u.job.state)) {
-      return res.status(409).json({ error: 'Este archivo ya fue enviado a SAC.' });
-    }
-    u.job = { state: 'PREPARING', progress: null };
-    const client = clientFor(req.auth);
-    const jobSettings = loader.jobSettingsFor({ importMethod: u.importMethod, template: u.template, meta: u.meta });
-    let r;
-    try {
-      r = await loader.prepare(client, {
-        modelId: u.model.id, importType: u.importType, records: u.records, jobSettings,
-        chunkSize: cfg.chunkSize, onProgress: (p) => { u.job.progress = p; },
+      const client = clientFor(req.auth);
+      const model = await resolveModel(client, template, String(req.body.modelId || ''));
+      const meta = buildMeta(await client.getMetadata(model.id), template);
+      const grid = await parseFile({
+        filename: req.file.originalname, buffer: req.file.buffer, preferredSheet: template.sheet, maxRows: cfg.maxRows,
       });
-    } catch (e) {
-      u.job = { state: 'ERROR', message: e.message };
-      throw e;
-    }
-    audit({
-      event: 'PREPARACION', user: req.auth.user.id, template: u.template.id, modelId: u.model.id, version: u.version,
-      importMethod: u.importMethod, sha256: u.sha256, ok: r.ok, stage: r.stage || null, jobId: r.jobId || null,
-      rows: r.totalRows ?? u.records.length, rejected: r.rejected?.length || 0,
-    });
-    if (!r.ok) {
-      u.job = { state: 'REJECTED', stage: r.stage, message: r.message, rejected: r.rejected };
-      return res.json({ ok: false, stage: r.stage, message: r.message, rejected: r.rejected.slice(0, 200), rejectedCount: r.rejected.length });
-    }
-    u.job = {
-      state: 'PREPARED', jobId: r.jobId, totalRows: r.totalRows, preparedAt: Date.now(),
-      cleanAndReplaceAffectedRows: r.cleanAndReplaceAffectedRows,
-    };
-    return res.json({
-      ok: true, totalRows: r.totalRows, importMethod: u.importMethod,
-      jobSettings, cleanAndReplaceAffectedRows: r.cleanAndReplaceAffectedRows,
-    });
-  }));
 
-  app.post('/api/sac/run', requireAjax, requireAuth, (req, res) => {
-    const u = getUpload(req, res);
-    if (!u) return;
-    if (u.job?.state !== 'PREPARED') return res.status(409).json({ error: 'Primero valide el archivo en SAC.' });
-    if (u.importMethod === 'CleanAndReplace' && req.body?.confirmCleanAndReplace !== true) {
-      return res.status(400).json({ error: 'Confirme que acepta borrar los datos existentes del alcance indicado.' });
-    }
-    const entry = req.auth;
-    const { jobId } = u.job;
-    u.job = { ...u.job, state: 'RUNNING', startedAt: Date.now(), status: null };
-    loader.run(clientFor(entry), jobId, { onStatus: (s) => { u.job.status = s; } })
-      .then((s) => {
-        u.job = { ...u.job, state: s.jobStatus === 'COMPLETED' ? 'COMPLETED' : s.jobStatus, status: s, rejected: s.rejected || [], finishedAt: Date.now() };
-      })
-      .catch((e) => {
-        u.job = { ...u.job, state: 'ERROR', message: e.message, finishedAt: Date.now() };
-      })
-      .finally(() => {
-        audit({
-          event: 'CARGA', user: entry.user.id, template: u.template.id, modelId: u.model.id, version: u.version,
-          importMethod: u.importMethod, sha256: u.sha256, jobId, state: u.job.state,
-          rows: u.job.status?.totalNumberRowsInJob ?? u.job.totalRows, failed: u.job.status?.failedNumberRows ?? null,
-          ms: u.job.finishedAt - u.job.startedAt,
+      // Miembros de cada dimensión (Data Export API) para validar códigos antes de enviar
+      const members = new Map();
+      const extraIssues = [];
+      if (grid.info?.warning) {
+        extraIssues.push({ severity: 'warning', code: 'ARCH_HOJA', title: 'Hoja leída', message: grid.info.warning });
+      }
+      if (cfg.validateMembers) {
+        const dims = meta.keys.filter((k) => k !== meta.dateColumn && k !== meta.measure);
+        const results = await Promise.all(dims.map((d) => membersOf(client, model.id, d)
+          .then((set) => ({ d, set }))
+          .catch((e) => ({ d, set: null, err: e }))));
+        const skipped = [];
+        for (const { d, set, err } of results) {
+          if (set) members.set(d, set);
+          else if (d !== meta.versionColumn) skipped.push(err ? `${d} (${err.status || 'error'})` : d);
+        }
+        if (skipped.length) {
+          extraIssues.push({
+            severity: 'warning', code: 'MIEMBROS_NO_VERIFICADOS', title: 'Miembros no verificados localmente',
+            message: `No se pudo leer el maestro de: ${skipped.join(', ')}. Esos códigos los validará SAC en el siguiente paso.`,
+          });
+        }
+      }
+
+      const result = validate({
+        grid, template, meta, members,
+        options: {
+          version, numberLocale: template.numberLocale || cfg.numberLocale,
+          maxRows: cfg.maxRows, blockedVersions: cfg.blockedVersions,
+        },
+      });
+
+      const importType = version.toLowerCase().startsWith('private.') ? 'privateFactData' : (template.importType || 'factData');
+      const sha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+      const uploadId = oauth.randomToken(18);
+      const issues = [...extraIssues, ...result.issues];
+      result.summary.warnings += extraIssues.length;
+      uploads.set(uploadId, {
+        uploadId, vaultKey: req.vaultKey, createdAt: Date.now(),
+        template, model, meta, importType, version, importMethod,
+        fileName: req.file.originalname, sha256,
+        ok: result.ok, records: result.ok ? result.records : [], issues, summary: result.summary, job: null,
+      });
+
+      audit({
+        event: 'VALIDACION', user: req.auth.user.id, template: template.id, model: model.name, modelId: model.id,
+        version, importMethod, file: req.file.originalname, sha256, ok: result.ok,
+        records: result.records.length, errors: result.summary.errors, warnings: result.summary.warnings,
+        ms: Date.now() - started,
+      });
+
+      return res.json({
+        uploadId, ok: result.ok,
+        model, importType, importMethod, version,
+        columns: [...meta.keys, meta.measure],
+        summary: { ...result.summary, fileName: req.file.originalname, sizeBytes: req.file.size, sha256 },
+        issues,
+        preview: result.records.slice(0, PREVIEW_ROWS),
+      });
+    }));
+
+    // Reporte de hallazgos en CSV (separador ";" y BOM para abrir directo en Excel es-CO)
+    app.get('/api/report/:uploadId', requireAuth, (req, res) => {
+      const u = getUpload(req, res);
+      if (!u) return;
+      const q = (v) => {
+        let s = v === null || v === undefined ? '' : String(v);
+        if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`; // evita inyección de fórmulas en Excel
+        return `"${s.replace(/"/g, '""')}"`;
+      };
+      const lines = [['Severidad', 'Código', 'Tipo', 'Fila', 'Columna', 'Valor', 'Detalle'].map(q).join(';')];
+      for (const i of u.issues) {
+        lines.push([i.severity === 'error' ? 'Error' : 'Advertencia', i.code, i.title, i.row, i.column, i.value, i.message].map(q).join(';'));
+      }
+      for (const r of u.job?.rejected || []) {
+        const { _REJECTION_REASON: reason, ...row } = r;
+        lines.push(['Error', 'RECHAZO_SAC', 'Fila rechazada por SAC', '', '', JSON.stringify(row), reason].map(q).join(';'));
+      }
+      const base = path.basename(u.fileName, path.extname(u.fileName)).replace(/[^\w.-]+/g, '_');
+      res.set('Content-Type', 'text/csv; charset=utf-8');
+      res.set('Content-Disposition', `attachment; filename="validacion_${base}.csv"`);
+      res.send(`﻿${lines.join('\r\n')}\r\n`);
+    });
+
+    // ------------------------------------------------------------ SAC: preparar (validar en SAC) y ejecutar
+    app.post('/api/sac/prepare', requireAjax, requireAuth, wrap(async (req, res) => {
+      const u = getUpload(req, res);
+      if (!u) return;
+      if (!u.ok) return res.status(409).json({ error: 'Corrija los errores de la validación local antes de continuar.' });
+      if (u.job && ['PREPARING', 'PREPARED', 'RUNNING', 'COMPLETED'].includes(u.job.state)) {
+        return res.status(409).json({ error: 'Este archivo ya fue enviado a SAC.' });
+      }
+      u.job = { state: 'PREPARING', progress: null };
+      const client = clientFor(req.auth);
+      const jobSettings = loader.jobSettingsFor({ importMethod: u.importMethod, template: u.template, meta: u.meta });
+      let r;
+      try {
+        r = await loader.prepare(client, {
+          modelId: u.model.id, importType: u.importType, records: u.records, jobSettings,
+          chunkSize: cfg.chunkSize, onProgress: (p) => { u.job.progress = p; },
         });
+      } catch (e) {
+        u.job = { state: 'ERROR', message: e.message };
+        throw e;
+      }
+      audit({
+        event: 'PREPARACION', user: req.auth.user.id, template: u.template.id, modelId: u.model.id, version: u.version,
+        importMethod: u.importMethod, sha256: u.sha256, ok: r.ok, stage: r.stage || null, jobId: r.jobId || null,
+        rows: r.totalRows ?? u.records.length, rejected: r.rejected?.length || 0,
       });
-    res.status(202).json({ ok: true, state: 'RUNNING' });
-  });
+      if (!r.ok) {
+        u.job = { state: 'REJECTED', stage: r.stage, message: r.message, rejected: r.rejected };
+        return res.json({ ok: false, stage: r.stage, message: r.message, rejected: r.rejected.slice(0, 200), rejectedCount: r.rejected.length });
+      }
+      u.job = {
+        state: 'PREPARED', jobId: r.jobId, totalRows: r.totalRows, preparedAt: Date.now(),
+        cleanAndReplaceAffectedRows: r.cleanAndReplaceAffectedRows,
+      };
+      return res.json({
+        ok: true, totalRows: r.totalRows, importMethod: u.importMethod,
+        jobSettings, cleanAndReplaceAffectedRows: r.cleanAndReplaceAffectedRows,
+      });
+    }));
 
-  app.get('/api/sac/status/:uploadId', requireAuth, (req, res) => {
-    const u = getUpload(req, res);
-    if (!u) return;
-    const j = u.job || { state: 'NONE' };
-    res.json({
-      state: j.state, progress: j.progress || null, status: j.status || null, message: j.message || null,
-      totalRows: j.totalRows ?? null, rejected: (j.rejected || []).slice(0, 200), rejectedCount: (j.rejected || []).length,
+    app.post('/api/sac/run', requireAjax, requireAuth, (req, res) => {
+      const u = getUpload(req, res);
+      if (!u) return;
+      if (u.job?.state !== 'PREPARED') return res.status(409).json({ error: 'Primero valide el archivo en SAC.' });
+      if (u.importMethod === 'CleanAndReplace' && req.body?.confirmCleanAndReplace !== true) {
+        return res.status(400).json({ error: 'Confirme que acepta borrar los datos existentes del alcance indicado.' });
+      }
+      const entry = req.auth;
+      const { jobId } = u.job;
+      u.job = { ...u.job, state: 'RUNNING', startedAt: Date.now(), status: null };
+      loader.run(clientFor(entry), jobId, { onStatus: (s) => { u.job.status = s; } })
+        .then((s) => {
+          u.job = { ...u.job, state: s.jobStatus === 'COMPLETED' ? 'COMPLETED' : s.jobStatus, status: s, rejected: s.rejected || [], finishedAt: Date.now() };
+        })
+        .catch((e) => {
+          u.job = { ...u.job, state: 'ERROR', message: e.message, finishedAt: Date.now() };
+        })
+        .finally(() => {
+          audit({
+            event: 'CARGA', user: entry.user.id, template: u.template.id, modelId: u.model.id, version: u.version,
+            importMethod: u.importMethod, sha256: u.sha256, jobId, state: u.job.state,
+            rows: u.job.status?.totalNumberRowsInJob ?? u.job.totalRows, failed: u.job.status?.failedNumberRows ?? null,
+            ms: u.job.finishedAt - u.job.startedAt,
+          });
+        });
+      res.status(202).json({ ok: true, state: 'RUNNING' });
     });
-  });
 
-  app.post('/api/sac/cancel', requireAjax, requireAuth, wrap(async (req, res) => {
-    const u = getUpload(req, res);
-    if (!u) return;
-    if (u.job?.state !== 'PREPARED') return res.status(409).json({ error: 'No hay una carga pendiente por cancelar.' });
-    await loader.safeDelete(clientFor(req.auth), u.job.jobId);
-    audit({ event: 'CANCELACION', user: req.auth.user.id, jobId: u.job.jobId, sha256: u.sha256 });
-    u.job = { state: 'CANCELLED' };
-    res.json({ ok: true });
-  }));
+    app.get('/api/sac/status/:uploadId', requireAuth, (req, res) => {
+      const u = getUpload(req, res);
+      if (!u) return;
+      const j = u.job || { state: 'NONE' };
+      res.json({
+        state: j.state, progress: j.progress || null, status: j.status || null, message: j.message || null,
+        totalRows: j.totalRows ?? null, rejected: (j.rejected || []).slice(0, 200), rejectedCount: (j.rejected || []).length,
+      });
+    });
+
+    app.post('/api/sac/cancel', requireAjax, requireAuth, wrap(async (req, res) => {
+      const u = getUpload(req, res);
+      if (!u) return;
+      if (u.job?.state !== 'PREPARED') return res.status(409).json({ error: 'No hay una carga pendiente por cancelar.' });
+      await loader.safeDelete(clientFor(req.auth), u.job.jobId);
+      audit({ event: 'CANCELACION', user: req.auth.user.id, jobId: u.job.jobId, sha256: u.sha256 });
+      u.job = { state: 'CANCELLED' };
+      res.json({ ok: true });
+    }));
+  }
 
   // ------------------------------------------------------------ probador de data actions
-  const testRuns = new Map(); // runId -> { vaultKey, state, reports, current, ... }
-  const catalogFile = path.join(brand.dir, 'pruebas.json');
-  function loadCatalog() {
-    try { return JSON.parse(fs.readFileSync(catalogFile, 'utf8')); } catch { return { casos: [] }; }
-  }
-
-  app.get('/api/tests/catalog', requireAuth, (req, res) => {
-    const cat = loadCatalog();
-    res.json({ casos: Array.isArray(cat.casos) ? cat.casos : [], plantilla: cat.plantilla || null, blockedVersions: cfg.blockedVersions });
-  });
-
-  function caseFromBody(body) {
-    const c = body?.case;
-    if (!c || typeof c !== 'object' || Array.isArray(c)) throw new CaseError('Envíe la definición del caso de prueba (JSON).');
-    if (JSON.stringify(c).length > 200000) throw new CaseError('La definición del caso es demasiado grande.');
-    return c;
-  }
-  const seedOf = (x) => (Number.isInteger(Number(x)) && Number(x) > 0 ? Number(x) : Math.floor(Math.random() * 1e9) + 1);
-
-  app.post('/api/tests/preview', requireAjax, requireAuth, wrap(async (req, res) => {
-    const report = await tester.runCase(clientFor(req.auth), caseFromBody(req.body), {
-      seed: seedOf(req.body.seed), blockedVersions: cfg.blockedVersions, preview: true,
-    });
-    res.json(report);
-  }));
-
-  app.post('/api/tests/run', requireAjax, requireAuth, wrap(async (req, res) => {
-    const raw = caseFromBody(req.body);
-    if (req.body.confirmVersion !== true) {
-      return res.status(400).json({ error: 'Confirme que la versión es de pruebas: la prueba borra los datos de su alcance antes de cargar.' });
-    }
-    for (const r of testRuns.values()) {
-      if (r.vaultKey === req.vaultKey && r.state === 'RUNNING') return res.status(409).json({ error: 'Ya tiene una prueba en curso; espere a que termine.' });
-    }
-    const reps = Math.min(Math.max(Number.parseInt(req.body.repeticiones, 10) || 1, 1), 20);
-    const seed = seedOf(req.body.seed);
-    const runId = crypto.randomBytes(12).toString('hex');
-    const run = { vaultKey: req.vaultKey, state: 'RUNNING', reps, seed, reports: [], current: null, createdAt: Date.now() };
-    testRuns.set(runId, run);
-    const entry = req.auth;
-    (async () => {
-      for (let i = 0; i < reps; i++) {
-        const report = await tester.runCase(clientFor(entry), raw, {
-          seed: seed + i, blockedVersions: cfg.blockedVersions, chunkSize: cfg.chunkSize,
-          onUpdate: (r) => { run.current = r; },
-        });
-        run.reports.push(report);
-        run.current = null;
-        audit({
-          event: 'PRUEBA_DATA_ACTION', user: entry.user.id, caso: report.case?.id || raw.id, modelId: report.case?.modelo,
-          multiAction: report.case?.multiAction, version: report.case?.version, seed: report.seed, state: report.state,
-          cells: report.summary?.cells ?? null, failed: report.summary?.failed ?? null, ms: report.ms,
-        });
-        if (report.state !== 'PASSED' && req.body.detenerEnFallo !== false) break;
-      }
-      run.state = 'DONE';
-    })().catch((e) => { run.state = 'DONE'; run.error = e.message; });
-    res.status(202).json({ runId, seed, repeticiones: reps });
-  }));
-
-  function getRun(req, res) {
-    const run = testRuns.get(String(req.params.runId || ''));
-    if (!run || run.vaultKey !== req.vaultKey) { res.status(404).json({ error: 'La prueba no existe o expiró.' }); return null; }
-    return run;
-  }
-
-  app.get('/api/tests/status/:runId', requireAuth, (req, res) => {
-    const run = getRun(req, res);
-    if (!run) return;
-    const slim = (r) => r && ({ ...r, groups: r.groups.map((g) => ({ ...g, cells: g.cells.slice(0, 2000) })) });
-    res.json({ state: run.state, reps: run.reps, seed: run.seed, error: run.error || null, current: slim(run.current), reports: run.reports.map(slim) });
-  });
-
-  app.get('/api/tests/report/:runId', requireAuth, (req, res) => {
-    const run = getRun(req, res);
-    if (!run) return;
-    res.set('Content-Disposition', `attachment; filename="prueba-data-action-${run.seed}.csv"`);
-    res.type('text/csv; charset=utf-8').send(tester.reportCsv(run.reports));
-  });
+  const testerRoutes = mode === 'probador'
+    ? require('./tester/routes').register(app, { cfg, brand, audit, requireAuth, requireAjax, wrap, clientFor })
+    : null;
 
   // ------------------------------------------------------------ errores
   app.use('/api', (req, res) => res.status(404).json({ error: 'Ruta no encontrada.' }));
@@ -606,7 +533,7 @@ function createApp(cfg, { audit = () => {}, logger = console } = {}) {
     return res.status(500).json({ error: 'Error interno. Revise el log del servidor.' });
   });
 
-  app.locals.stop = () => clearInterval(sweeper);
+  app.locals.stop = () => { clearInterval(sweeper); testerRoutes?.stop(); };
   return app;
 }
 

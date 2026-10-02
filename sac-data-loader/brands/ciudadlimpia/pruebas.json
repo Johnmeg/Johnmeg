@@ -4,7 +4,7 @@
     {
       "id": "CL_PXQ_RESIDUOS",
       "nombre": "P×Q residuos: Tarifa × Cantidad (Ingreso)",
-      "descripcion": "Data action CL_CALC_PXQ: ING_RES = TARI_RES × CANT_RESI por mes, Sociedad y Cebes. Cambie multiAction por el ID real.",
+      "descripcion": "Data action CL_CALC_PXQ: ING_RES = TARI_RES × CANT_RESI. Parámetros del data action: versión, periodos, Sociedad y Cebes (elíjalos en el paso 2). Cambie la multi action por la real.",
       "modelo": "Cdtrt4eesot3vn57g9a9ve57v5o",
       "multiAction": "t.DEMO:CL_PXQ",
       "version": "public.PRUEBAS",
@@ -18,13 +18,29 @@
       },
       "parametros": [
         {
-          "parameterId": "TargetVersion",
-          "value": {
-            "memberIds": [
-              "{{version}}"
-            ],
-            "hierarchyId": null
-          }
+          "id": "TargetVersion",
+          "tipo": "version"
+        },
+        {
+          "id": "Periodo",
+          "tipo": "periodos"
+        },
+        {
+          "id": "Sociedad",
+          "tipo": "miembro",
+          "dimension": "Sociedad_CL",
+          "valor": [
+            "CL_BOG"
+          ]
+        },
+        {
+          "id": "Cebes",
+          "tipo": "miembro",
+          "dimension": "Cebes_CL",
+          "valor": [
+            "RECOLECCION",
+            "BARRIDO"
+          ]
         }
       ],
       "entradas": [
@@ -34,12 +50,8 @@
             "Ratio_CL": "TARI_RES"
           },
           "variar": {
-            "Sociedad_CL": {
-              "aleatorio": 1
-            },
-            "Cebes_CL": {
-              "aleatorio": 2
-            }
+            "Sociedad_CL": "$Sociedad",
+            "Cebes_CL": "$Cebes"
           },
           "min": 40000,
           "max": 60000,
@@ -51,8 +63,8 @@
             "Ratio_CL": "CANT_RESI"
           },
           "variar": {
-            "Sociedad_CL": "@TARIFA",
-            "Cebes_CL": "@TARIFA"
+            "Sociedad_CL": "$Sociedad",
+            "Cebes_CL": "$Cebes"
           },
           "min": 50,
           "max": 500,
@@ -66,8 +78,8 @@
             "Ratio_CL": "ING_RES"
           },
           "variar": {
-            "Sociedad_CL": "@TARIFA",
-            "Cebes_CL": "@TARIFA"
+            "Sociedad_CL": "$Sociedad",
+            "Cebes_CL": "$Cebes"
           },
           "formula": "v('TARIFA') * v('CANTIDAD')"
         }
@@ -77,7 +89,7 @@
     {
       "id": "CL_DISTRIB_KM",
       "nombre": "Distribución de gastos por kilómetros (Gastos)",
-      "descripcion": "Data action CL_DISTRIB_KM: los gastos de los Cecos EMISOR se reparten a los Cecos RECEPTOR según los km. Elige al azar 2 emisores y 3 receptores por sus propiedades.",
+      "descripcion": "Data action CL_DISTRIB_KM: los gastos de los Cecos EMISOR se reparten a los Cecos RECEPTOR según los km. Parámetros: versión, periodos y Sociedad. Elige al azar 2 emisores y 3 receptores por sus propiedades.",
       "modelo": "Cl2fsrpi6n57id7iqdnck2m2p5t",
       "multiAction": "t.DEMO:CL_DISTRIB_KM",
       "version": "public.PRUEBAS",
@@ -87,13 +99,21 @@
       ],
       "parametros": [
         {
-          "parameterId": "TargetVersion",
-          "value": {
-            "memberIds": [
-              "{{version}}"
-            ],
-            "hierarchyId": null
-          }
+          "id": "TargetVersion",
+          "tipo": "version"
+        },
+        {
+          "id": "Periodo",
+          "tipo": "periodos"
+        },
+        {
+          "id": "Sociedad",
+          "tipo": "miembro",
+          "dimension": "Sociedad_CL",
+          "valor": [
+            "CL_BOG"
+          ],
+          "multiple": false
         }
       ],
       "entradas": [
@@ -104,9 +124,6 @@
             "Moneda_CL": "COP"
           },
           "variar": {
-            "Sociedad_CL": {
-              "aleatorio": 1
-            },
             "Cecos_CL": {
               "aleatorio": 2,
               "filtro": {
@@ -130,7 +147,6 @@
             "Moneda_CL": "KILOMETROS"
           },
           "variar": {
-            "Sociedad_CL": "@GASTO",
             "Cecos_CL": {
               "aleatorio": 3,
               "filtro": {
@@ -151,7 +167,6 @@
             "Moneda_CL": "COP"
           },
           "variar": {
-            "Sociedad_CL": "@GASTO",
             "Cecos_CL": "@KM",
             "Cuentas_Egresos_CL": "@GASTO"
           },
@@ -164,7 +179,6 @@
             "Moneda_CL": "COP"
           },
           "variar": {
-            "Sociedad_CL": "@GASTO",
             "Cecos_CL": "@GASTO",
             "Cuentas_Egresos_CL": "@GASTO"
           },
@@ -178,14 +192,16 @@
             "Moneda_CL": "KILOMETROS"
           },
           "variar": {
-            "Sociedad_CL": "@GASTO",
             "Cecos_CL": "@KM"
           },
           "formula": "v('KM') / sum('KM')",
           "tolerancia": 1e-06
         }
       ],
-      "tolerancia": 0.01
+      "tolerancia": 0.01,
+      "comun": {
+        "Sociedad_CL": "$Sociedad"
+      }
     }
   ]
 }

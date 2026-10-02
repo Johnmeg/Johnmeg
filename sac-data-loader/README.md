@@ -215,9 +215,22 @@ test/                   pruebas y SAC simulado
 samples/                archivos de ejemplo
 ```
 
-## 9. Probador de data actions (`/pruebas`)
+## 9. Probador de data actions (aplicación separada)
 
-Pantalla **Probar data actions**, en el menú superior. Prueba un data action con datos aleatorios en pocos segundos, sin construir historias ni cargar archivos a mano. Por cada prueba:
+Es una **aplicación independiente del cargador**: el mismo código arrancado con `APP_MODE=probador`. Tiene su propio puerto, su `.env`, su carpeta, su acceso directo e instalador (`Instalar-ProbadorDA-<Marca>.exe`) y su Redirect URI. Para Fanalca es `http://localhost:3011/auth/callback`; para Ciudad Limpia, `http://localhost:3010/auth/callback`. El cargador no muestra ni publica nada del probador, y viceversa.
+
+Prueba un data action con datos aleatorios en pocos segundos, sin construir historias ni cargar archivos a mano. En pantalla se eligen:
+- **Modelo**, **multi action** (ID), **versión de pruebas** (lista del modelo; las bloqueadas no se pueden elegir), **periodos** (desde/hasta) y **tolerancia**.
+- **Parámetros del data action**, los mismos de la multi action:
+  - **Versión**: envía la versión de pruebas.
+  - **Periodos**: envía los periodos elegidos.
+  - **Miembro(s)**: se elige la dimensión y se buscan los miembros directamente en SAC.
+  - **Número**.
+
+  Un parámetro de tipo miembro también se puede usar en los datos de prueba con `"$ID"`. Por ejemplo, `"comun": { "Sociedades": "$Sociedad" }` o `"variar": { "Cebes": "$Cebes" }`, para que los datos aleatorios queden dentro del alcance del parámetro.
+- **Datos de prueba y resultado esperado** en el JSON del caso. Se sincroniza con los formularios.
+
+Por cada prueba:
 
 1. **Valida la definición** del caso y **lee la estructura del modelo**.
 2. **Resuelve los miembros**: listas fijas, miembros **al azar** del maestro (también filtrados por propiedad, por ejemplo `EMISOR = Y`) o los mismos de otra entrada (`@ENTRADA`). Verifica que todos existan.
@@ -230,9 +243,10 @@ Pantalla **Probar data actions**, en el menú superior. Prueba un data action co
 Con **Repeticiones** corre el mismo caso varias veces con semillas distintas. **Vista previa** hace los pasos 1 a 3 sin escribir nada en SAC.
 
 ### Preparación en SAC (una vez)
+- **Cliente OAuth propio del probador** (*Interactive Usage*) con la Redirect URI de su puerto (tabla de la Opción E en `DESPLIEGUE.md`).
 - **Versión de pruebas** pública en cada modelo, por ejemplo `public.PRUEBAS`. La prueba **borra sus datos** en los periodos del caso antes de cargar. Las versiones de `BLOCKED_VERSIONS` (`public.Actual`) se rechazan.
 - **Multi action por data action**: SAC no tiene API pública para ejecutar un data action directamente. Cree una multi action con un paso *Data Action* y exponga el parámetro de versión, por ejemplo `TargetVersion`. Su ID tiene la forma `<paquete>:<ID>` (ejemplo de SAP: `t.TEST:CEEFOKMRUKJBY5BN47F1NS2L8G`); el ID del objeto aparece en la URL del navegador al abrir la multi action.
-- **Cliente OAuth**: el mismo del cargador (*Interactive Usage*). SAP indica que la API de multi actions se usa con un usuario de negocio y no admite *client credentials*.
+- La API de multi actions se usa con un **usuario de negocio** (*Interactive Usage*); SAP indica que no admite *client credentials*.
 - **Permisos** del usuario: escribir en el modelo y ejecutar la multi action.
 
 ### Definición del caso (JSON)
@@ -243,8 +257,11 @@ Con **Repeticiones** corre el mismo caso varias veces con semillas distintas. **
   "multiAction": "t.XXXX:CXXXXXXXXXXXXXXXXXXXXXXXX",
   "version": "public.PRUEBAS",
   "periodos": { "desde": "202601", "hasta": "202603" },
-  "comun": { "Auditoria": "PRESUPUESTO_EXCEL", "Moneda": "COP" },
-  "parametros": [ { "parameterId": "TargetVersion", "value": { "memberIds": ["{{version}}"], "hierarchyId": null } } ],
+  "parametros": [
+    { "id": "TargetVersion", "tipo": "version" },
+    { "id": "Sociedad", "tipo": "miembro", "dimension": "Sociedades", "valor": ["FN_MOTOS"], "multiple": false }
+  ],
+  "comun": { "Auditoria": "PRESUPUESTO_EXCEL", "Moneda": "COP", "Sociedades": "$Sociedad" },
   "entradas": [
     { "nombre": "PRECIO", "fijo": { "Ratio": "PRECIO" }, "variar": { "Sociedades": { "aleatorio": 1 }, "Cebes": { "aleatorio": 2 } }, "min": 5000000, "max": 15000000, "decimales": 0 },
     { "nombre": "UNIDADES", "fijo": { "Ratio": "UNIDADES" }, "variar": { "Sociedades": "@PRECIO", "Cebes": "@PRECIO" }, "min": 10, "max": 2000, "decimales": 0 }
@@ -260,7 +277,7 @@ Con **Repeticiones** corre el mismo caso varias veces con semillas distintas. **
 |---|---|
 | `comun` / `fijo` | Miembros fijos (para todas las celdas / para un grupo). Las dimensiones que no se indiquen se cargan con `#` |
 | `variar` | Lista de miembros, `{ "aleatorio": n, "filtro": { "PROPIEDAD": "valor" } }` o `"@ENTRADA"` |
-| `parametros` | `parameterValues` de la multi action. `{{version}}` se reemplaza por la versión del caso; `"{{periodos}}"` dentro de `memberIds` se reemplaza por los periodos |
+| `parametros` | Parámetros de la multi action: `{ "id", "tipo": "version" \| "periodos" \| "miembro" \| "numero", "dimension", "valor", "multiple", "jerarquia" }`. También se acepta el formato de la API de SAP `{ "parameterId", "value" }`, que se envía tal cual, con `{{version}}` y `"{{periodos}}"` reemplazados |
 | `limpieza.alcance` | Dimensiones del *CleanAndReplace* (por defecto `["Version", "Date"]`) |
 | `esperaMaxSeg` | Tiempo máximo de espera de la multi action (por defecto 600) |
 

@@ -1,6 +1,8 @@
 ﻿<#
 .SYNOPSIS
-  Instala el Cargador de datos a SAC (Ciudad Limpia, Fanalca) en el computador del usuario.
+  Instala el Cargador de datos a SAC o el Probador de data actions (Ciudad Limpia, Fanalca)
+  en el computador del usuario. Son aplicaciones separadas: cada una con su carpeta, su
+  acceso directo, su puerto y su configuración.
 
 .DESCRIPTION
   No requiere permisos de administrador. Se instala en %LOCALAPPDATA%\<carpeta de la marca>
@@ -20,6 +22,9 @@
 .PARAMETER Marca
   ciudadlimpia o fanalca. Por defecto la del archivo marca.txt del paquete.
 
+.PARAMETER Producto
+  cargador o probador. Por defecto el del archivo producto.txt del paquete.
+
 .PARAMETER Puerto
   Puerto local (por defecto el de la marca: 3000 Ciudad Limpia, 3001 Fanalca). Debe
   coincidir con la Redirect URI del cliente OAuth en SAC: http://localhost:<Puerto>/auth/callback
@@ -34,6 +39,8 @@
 param(
     [ValidatePattern('^[a-z0-9-]*$')]
     [string]$Marca,
+    [ValidatePattern('^[a-z]*$')]
+    [string]$Producto,
     [string]$Destino,
     [ValidateRange(0, 65535)]
     [int]$Puerto = 0,
@@ -107,7 +114,7 @@ function Pedir-DatosSac-Ventana($valores) {
     } catch { return $false }
 
     $f = New-Object Windows.Forms.Form
-    $f.Text = "Cargador de datos a SAC - $NombreMarca"
+    $f.Text = $Titulo
     $f.StartPosition = 'CenterScreen'
     $f.FormBorderStyle = 'FixedDialog'
     $f.MaximizeBox = $false
@@ -259,9 +266,18 @@ if ($Marca -notmatch '^[a-z0-9-]+$' -or -not (Test-Path $jsonMarca)) {
 }
 $infoMarca = [IO.File]::ReadAllText($jsonMarca, [Text.Encoding]::UTF8) | ConvertFrom-Json
 $NombreMarca = $infoMarca.name
-$Titulo = $infoMarca.installer.shortcut
-if (-not $Destino) { $Destino = Join-Path $env:LOCALAPPDATA $infoMarca.installer.folder }
-if (-not $Puerto) { $Puerto = [int]$infoMarca.installer.port }
+if (-not $Producto) {
+    $archivoProducto = @((Join-Path $Aqui 'producto.txt'), (Join-Path $Aqui '..\producto.txt')) | Where-Object { Test-Path $_ } | Select-Object -First 1
+    $Producto = if ($archivoProducto) { (Get-Content $archivoProducto -Raw).Trim().ToLower() } else { 'cargador' }
+}
+$infoProducto = $infoMarca.installer.$Producto
+if ($Producto -notin @('cargador', 'probador') -or -not $infoProducto) {
+    Write-Host "  ERROR: el producto '$Producto' no existe (use cargador o probador)." -ForegroundColor Red
+    exit 1
+}
+$Titulo = $infoProducto.shortcut
+if (-not $Destino) { $Destino = Join-Path $env:LOCALAPPDATA $infoProducto.folder }
+if (-not $Puerto) { $Puerto = [int]$infoProducto.port }
 if ($Puerto -lt 1024) { Write-Host '  ERROR: el puerto debe estar entre 1024 y 65535.' -ForegroundColor Red; exit 1 }
 
 New-Item -ItemType Directory -Force -Path $Destino | Out-Null
@@ -270,7 +286,7 @@ Start-Transcript -Path $transcript | Out-Null
 
 try {
     Write-Host ''
-    Write-Host "  Cargador de datos a SAC - $NombreMarca" -ForegroundColor Green
+    Write-Host "  $Titulo" -ForegroundColor Green
     Write-Host "  Instalación para el usuario $env:USERNAME en $Destino" -ForegroundColor Green
 
     # -------------------------------------------------------------- 1. versión anterior abierta
@@ -421,16 +437,17 @@ try {
     $valores['APP_BASE_URL'] = "http://localhost:$Puerto"
     $valores['TRUST_PROXY'] = 'false'
     $valores['BRAND'] = $Marca
+    $valores['APP_MODE'] = $Producto
     if (-not (Valor-Util $valores['SESSION_SECRET']) -or $valores['SESSION_SECRET'].Length -lt 32) { $valores['SESSION_SECRET'] = Nueva-Clave }
     $porDefecto = [ordered]@{ SESSION_MINUTES = '60'; SAC_OAUTH_PKCE = 'true'; MAX_FILE_MB = '20'; MAX_ROWS = '100000'; CHUNK_SIZE = '10000';
         NUMBER_LOCALE = 'es'; BLOCKED_VERSIONS = 'public.Actual'; VALIDATE_MEMBERS = 'true'; SAC_DEBUG = 'false' }
     foreach ($k in $porDefecto.Keys) { if (-not $valores.Contains($k)) { $valores[$k] = $porDefecto[$k] } }
     foreach ($k in @('AUDIT_FILE', 'TEMPLATES_FILE', 'COOKIE_SECURE')) { if ($valores.Contains($k)) { $valores.Remove($k) } }
 
-    $orden = @('BRAND', 'PORT', 'HOST', 'APP_BASE_URL', 'TRUST_PROXY', 'SESSION_SECRET', 'SESSION_MINUTES', 'SAC_TENANT_URL', 'SAC_AUTHORIZE_URL',
+    $orden = @('BRAND', 'APP_MODE', 'PORT', 'HOST', 'APP_BASE_URL', 'TRUST_PROXY', 'SESSION_SECRET', 'SESSION_MINUTES', 'SAC_TENANT_URL', 'SAC_AUTHORIZE_URL',
         'SAC_TOKEN_URL', 'SAC_CLIENT_ID', 'SAC_CLIENT_SECRET', 'SAC_OAUTH_SCOPE', 'SAC_OAUTH_PKCE', 'MAX_FILE_MB', 'MAX_ROWS', 'CHUNK_SIZE',
         'NUMBER_LOCALE', 'BLOCKED_VERSIONS', 'VALIDATE_MEMBERS', 'SAC_DEBUG')
-    $lineas = @("# Cargador de datos a SAC ($NombreMarca) - configuración de $env:USERNAME ($(Get-Date -Format 'yyyy-MM-dd HH:mm'))")
+    $lineas = @("# $Titulo - configuración de $env:USERNAME ($(Get-Date -Format 'yyyy-MM-dd HH:mm'))")
     foreach ($k in $orden) { if ($valores.Contains($k)) { $lineas += "$k=$($valores[$k])" } }
     foreach ($k in $valores.Keys) { if ($orden -notcontains $k) { $lineas += "$k=$($valores[$k])" } }
     Escribir-Utf8 $envPath (($lineas -join "`r`n") + "`r`n")
@@ -473,10 +490,10 @@ try {
     $menu = Join-Path ([Environment]::GetFolderPath('Programs')) $Titulo
     New-Item -ItemType Directory -Force -Path $menu | Out-Null
     $abrir = Join-Path $Destino 'Abrir-CargadorSAC.cmd'
-    Crear-Acceso (Join-Path $escritorio "$Titulo.lnk") $abrir "Abre el Cargador de datos a SAC de $NombreMarca" 7
-    Crear-Acceso (Join-Path $menu "$Titulo.lnk") $abrir "Abre el Cargador de datos a SAC de $NombreMarca" 7
-    Crear-Acceso (Join-Path $menu "Detener $Titulo.lnk") (Join-Path $Destino 'Detener-CargadorSAC.cmd') 'Cierra el Cargador de datos a SAC' 1
-    Crear-Acceso (Join-Path $menu "Desinstalar $Titulo.lnk") (Join-Path $Destino 'Desinstalar-CargadorSAC.cmd') 'Quita el Cargador de datos a SAC' 1
+    Crear-Acceso (Join-Path $escritorio "$Titulo.lnk") $abrir "Abre $Titulo" 7
+    Crear-Acceso (Join-Path $menu "$Titulo.lnk") $abrir "Abre $Titulo" 7
+    Crear-Acceso (Join-Path $menu "Detener $Titulo.lnk") (Join-Path $Destino 'Detener-CargadorSAC.cmd') "Cierra $Titulo" 1
+    Crear-Acceso (Join-Path $menu "Desinstalar $Titulo.lnk") (Join-Path $Destino 'Desinstalar-CargadorSAC.cmd') "Quita $Titulo" 1
     Ok "Escritorio y menú Inicio: '$Titulo'"
 
     # -------------------------------------------------------------- 6. prueba

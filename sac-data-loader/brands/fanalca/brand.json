@@ -11,8 +11,15 @@
   "logoHeight": 38,
   "templates": "templates.json",
   "installer": {
-    "folder": "CargadorSAC-Fanalca",
-    "shortcut": "Cargador de datos a SAC - Fanalca",
-    "port": 3001
+    "cargador": {
+      "folder": "CargadorSAC-Fanalca",
+      "shortcut": "Cargador de datos a SAC - Fanalca",
+      "port": 3001
+    },
+    "probador": {
+      "folder": "ProbadorDA-Fanalca",
+      "shortcut": "Probador de data actions - Fanalca",
+      "port": 3011
+    }
   }
 }

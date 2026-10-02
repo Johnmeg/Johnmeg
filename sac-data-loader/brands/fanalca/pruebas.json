@@ -17,13 +17,8 @@
     },
     "parametros": [
       {
-        "parameterId": "TargetVersion",
-        "value": {
-          "memberIds": [
-            "{{version}}"
-          ],
-          "hierarchyId": null
-        }
+        "id": "TargetVersion",
+        "tipo": "version"
       }
     ],
     "entradas": [
@@ -77,7 +72,7 @@
     {
       "id": "FN_PXQ_VENTAS",
       "nombre": "P×Q ventas: Precio × Unidades (Ingresos)",
-      "descripcion": "Ejemplo: ING_VENTAS_NAL = PRECIO × UNIDADES por Sociedad, Cebes, Cliente y Referencia elegidos al azar. Ajuste multi action y códigos de Ratio a los de su modelo.",
+      "descripcion": "Ejemplo: ING_VENTAS_NAL = PRECIO × UNIDADES. Parámetros: versión y Sociedad (paso 2); Cebes, Cliente y Referencia se eligen al azar. Ajuste multi action y códigos de Ratio a los de su modelo.",
       "modelo": "Couh7ojg5e54rh2d4udijq6o83k",
       "multiAction": "t.DEMO:FN_PXQ",
       "version": "public.PRUEBAS",
@@ -87,17 +82,22 @@
       },
       "comun": {
         "Auditoria": "PRESUPUESTO_EXCEL",
-        "Moneda": "COP"
+        "Moneda": "COP",
+        "Sociedades": "$Sociedad"
       },
       "parametros": [
         {
-          "parameterId": "TargetVersion",
-          "value": {
-            "memberIds": [
-              "{{version}}"
-            ],
-            "hierarchyId": null
-          }
+          "id": "TargetVersion",
+          "tipo": "version"
+        },
+        {
+          "id": "Sociedad",
+          "tipo": "miembro",
+          "dimension": "Sociedades",
+          "valor": [
+            "FN_MOTOS"
+          ],
+          "multiple": false
         }
       ],
       "entradas": [
@@ -107,9 +107,6 @@
             "Ratio": "PRECIO"
           },
           "variar": {
-            "Sociedades": {
-              "aleatorio": 1
-            },
             "Cebes": {
               "aleatorio": 2
             },
@@ -130,7 +127,6 @@
             "Ratio": "UNIDADES"
           },
           "variar": {
-            "Sociedades": "@PRECIO",
             "Cebes": "@PRECIO",
             "Clientes": "@PRECIO",
             "Referencias": "@PRECIO"
@@ -147,7 +143,6 @@
             "Ratio": "ING_VENTAS_NAL"
           },
           "variar": {
-            "Sociedades": "@PRECIO",
             "Cebes": "@PRECIO",
             "Clientes": "@PRECIO",
             "Referencias": "@PRECIO"
@@ -174,13 +169,8 @@
       },
       "parametros": [
         {
-          "parameterId": "TargetVersion",
-          "value": {
-            "memberIds": [
-              "{{version}}"
-            ],
-            "hierarchyId": null
-          }
+          "id": "TargetVersion",
+          "tipo": "version"
         }
       ],
       "entradas": [

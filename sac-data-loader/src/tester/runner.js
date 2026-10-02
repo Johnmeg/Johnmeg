@@ -65,6 +65,9 @@ async function runCase(client, rawCase, { seed = 1, blockedVersions = [], chunkS
           if (d === meta.versionColumn || d === meta.dateColumn) throw new engine.CaseError(`${g.nombre}: no indique ${d}; se toma de "version" y "periodos".`);
         }
       }
+      for (const p of c.parametros.filter((x) => x.tipo === 'miembro')) {
+        if (!dims.has(p.dimension)) throw new engine.CaseError(`Parámetro ${p.etiqueta}: la dimensión "${p.dimension}" no existe en el modelo.`);
+      }
       return `Dimensiones: ${meta.keys.filter((k) => k !== meta.versionColumn && k !== meta.dateColumn).join(', ')} · medida ${meta.measure}`;
     });
 
@@ -86,6 +89,7 @@ async function runCase(client, rawCase, { seed = 1, blockedVersions = [], chunkS
       // Verifica que existan todos los miembros indicados (fijos y en listas)
       const used = new Map();
       const add = (d, m) => { if (m !== '#') { if (!used.has(d)) used.set(d, new Set()); used.get(d).add(m); } };
+      for (const p of c.parametros.filter((x) => x.tipo === 'miembro')) p.valor.forEach((m) => add(p.dimension, m));
       for (const g of [...c.entradas, ...c.esperado]) {
         for (const [d, m] of Object.entries({ ...c.comun, ...g.fijo })) add(d, m);
         for (const [d, list] of Object.entries(resolved.get(g.nombre))) list.forEach((m) => add(d, m));
@@ -138,7 +142,8 @@ async function runCase(client, rawCase, { seed = 1, blockedVersions = [], chunkS
     });
 
     await step('ejecucion', async (s) => {
-      const params = engine.fillParameters(c.parametros, c);
+      const params = engine.parameterValues(c);
+      report.parameterValues = params;
       const executionId = await client.runMultiAction(c.multiAction, params);
       report.multiAction = { executionId, status: 'running', messages: [] };
       const limit = Date.now() + c.esperaMaxSeg * 1000;
