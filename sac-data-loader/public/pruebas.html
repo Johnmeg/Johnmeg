@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Probador de data actions · {{name}}</title>
+  <link rel="icon" type="image/png" href="brand/img/favicon.png">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="brand/theme.css">
+  <script src="pruebas.js" defer></script>
+</head>
+<body class="brand-{{id}}">
+  <div class="utilbar">
+    <div class="wrap utilbar-inner">
+      <span class="util-label">{{utilLabel}}</span>
+      <div class="user" id="userBox" hidden>
+        <span class="avatar" id="userInitials" aria-hidden="true"></span>
+        <div class="user-text">
+          <span id="userName"></span>
+          <small id="userTenant"></small>
+        </div>
+        <button type="button" class="btn ghost small on-dark" id="logoutBtn">Cerrar sesión</button>
+      </div>
+    </div>
+  </div>
+
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="/" aria-label="{{name}} · {{appName}}">
+        <img class="logo logo-color" src="brand/img/logo.png" alt="{{name}}" width="{{logoWidth}}" height="{{logoHeight}}">
+        <img class="logo logo-white" src="brand/img/logo-blanco.png" alt="{{name}}" width="{{logoWidth}}" height="{{logoHeight}}">
+      </a>
+      <nav class="appnav" aria-label="Secciones">
+        <a href="/">Cargar datos</a>
+        <a href="/pruebas" aria-current="page">Probar data actions</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="wrap">
+      <p class="kicker">{{kicker}}</p>
+      <h1 class="hero-title">Probador de data actions</h1>
+      <p class="hero-text">Genera datos aleatorios en una versión de pruebas, ejecuta el data action (a través de una multi action) y compara el resultado de SAC con el valor esperado.</p>
+    </div>
+  </section>
+
+  <main>
+    <section id="loginView" class="card login" hidden>
+      <h2>Inicie sesión con su usuario de SAP Analytics Cloud</h2>
+      <p>Las pruebas se ejecutan con <b>sus propios permisos</b> de SAC: carga de datos en el modelo y ejecución de la multi action.</p>
+      <div class="alert error" id="loginError" hidden></div>
+      <a class="btn primary big" href="/auth/login?next=/pruebas">Iniciar sesión con SAP Analytics Cloud</a>
+    </section>
+
+    <div id="appView" hidden>
+      <section class="card" id="caseCard">
+        <h2>1. Caso de prueba</h2>
+        <div class="grid">
+          <label class="field">
+            <span>Casos guardados</span>
+            <select id="catalogSel"></select>
+            <small class="hint" id="catalogDesc"></small>
+          </label>
+          <div class="field">
+            <span>Definición</span>
+            <div class="row-actions">
+              <button type="button" class="btn ghost small" id="newBtn">Nueva plantilla</button>
+              <label class="btn ghost small file-btn">Abrir JSON<input type="file" id="openFile" accept=".json,application/json"></label>
+              <button type="button" class="btn ghost small" id="saveBtn">Descargar JSON</button>
+            </div>
+            <small class="hint">Los cambios se guardan en este navegador.</small>
+          </div>
+        </div>
+
+        <label class="field editor-field">
+          <span>Definición del caso (JSON)</span>
+          <textarea id="caseJson" rows="22" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+          <small class="hint" id="jsonState"></small>
+        </label>
+
+        <details class="guide">
+          <summary>Guía rápida de la definición</summary>
+          <ul>
+            <li><b>modelo</b>: ID del modelo (de la URL del Modeler). <b>multiAction</b>: ID de la multi action que ejecuta el data action, formato <code>&lt;paquete&gt;:&lt;ID&gt;</code>.</li>
+            <li><b>version</b>: versión <b>de pruebas</b>; antes de cargar se borran sus datos en los periodos del caso. <b>parametros</b>: los <code>parameterValues</code> de la multi action; <code>{{version}}</code> se reemplaza por la versión.</li>
+            <li><b>entradas</b>: datos aleatorios entre <b>min</b> y <b>max</b>. <b>fijo</b> = miembros fijos; <b>variar</b> = lista de miembros, <code>{"aleatorio": 3, "filtro": {"PROPIEDAD": "Y"}}</code> o <code>"@ENTRADA"</code>.</li>
+            <li><b>esperado</b>: celdas que el data action debe escribir y su <b>formula</b>: <code>v('PRECIO') * v('UNIDADES')</code>, <code>sum('GASTO') * v('KM') / sum('KM')</code>, <code>-v('GASTO')</code>, <code>round(x, 2)</code>, <code>c.Date</code>.</li>
+            <li><b>tolerancia</b>: diferencia permitida (por defecto 0,01).</li>
+          </ul>
+        </details>
+
+        <div class="grid run-options">
+          <label class="field">
+            <span>Semilla</span>
+            <div class="inline">
+              <input type="number" id="seed" min="1" step="1">
+              <button type="button" class="btn ghost small" id="seedBtn">Nueva</button>
+            </div>
+            <small class="hint">Con la misma semilla se generan los mismos datos.</small>
+          </label>
+          <label class="field">
+            <span>Repeticiones</span>
+            <input type="number" id="reps" min="1" max="20" value="1">
+            <small class="hint">Cada repetición usa otra semilla (datos distintos).</small>
+          </label>
+          <div class="field">
+            <span>Opciones</span>
+            <label class="check"><input type="checkbox" id="stopOnFail" checked> Detener en el primer fallo</label>
+          </div>
+        </div>
+
+        <label class="confirm" id="confirmBox">
+          <input type="checkbox" id="confirmVersion">
+          <span id="confirmText">Confirmo que la versión del caso es de pruebas: se borrarán sus datos en los periodos del caso antes de cargar.</span>
+        </label>
+
+        <div class="alert error" id="caseError" hidden></div>
+        <div class="actions">
+          <button type="button" class="btn ghost" id="previewBtn">Vista previa (sin escribir en SAC)</button>
+          <button type="button" class="btn primary" id="runBtn">Ejecutar prueba</button>
+        </div>
+      </section>
+
+      <section class="card" id="runCard" hidden>
+        <h2>2. Ejecución</h2>
+        <p class="hint" id="runInfo"></p>
+        <ol class="steps" id="stepsList"></ol>
+      </section>
+
+      <section class="card" id="resultCard" hidden>
+        <h2>3. Resultado</h2>
+        <div id="resultBanner" class="alert"></div>
+        <dl class="facts" id="facts"></dl>
+        <div class="table-wrap narrow-wide" id="repsWrap" hidden>
+          <table id="repsTable"><thead><tr><th>#</th><th>Semilla</th><th>Estado</th><th class="num">Celdas</th><th class="num">Con diferencia</th><th class="num">Tiempo</th></tr></thead><tbody></tbody></table>
+        </div>
+        <div id="maMessages"></div>
+        <div class="filters">
+          <label><input type="checkbox" id="onlyDiff"> Mostrar sólo celdas con diferencia</label>
+        </div>
+        <div id="groups"></div>
+        <details class="guide" id="inputsBox">
+          <summary>Datos de entrada generados</summary>
+          <div class="table-wrap"><table id="inputsTable"><thead></thead><tbody></tbody></table></div>
+        </details>
+        <div class="actions">
+          <a class="btn ghost" id="csvBtn" href="#" download hidden>Descargar resultado (CSV)</a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <span>{{footer}}</span>
+      <span>Los datos se cargan con su usuario de SAP Analytics Cloud</span>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+</body>
+</html>

@@ -6,7 +6,8 @@ const express = require('express');
 // Simulador de SAP Analytics Cloud para pruebas y demostración:
 //   - Servidor OAuth (authorize con página de login + token con PKCE y refresh)
 //   - Data Import API (/api/v1/dataimport) con CSRF, jobs, validate, run, status
-//   - Data Export API (/api/v1/dataexport) para leer miembros, paginado
+//   - Data Export API (/api/v1/dataexport) para leer miembros (con propiedades) y FactData
+//   - API de multi actions (/api/v1/multiActions) con data actions simulados
 // Imita las respuestas documentadas por SAP; no es un SAC real.
 
 const CLIENT_ID = 'sac-loader-demo';
@@ -16,7 +17,7 @@ const USERS = {
   luis: { password: 'demo', given_name: 'Luis', family_name: 'Sin Permisos', email: 'luis@demo.test', readOnly: true },
 };
 
-const VERSIONS = ['public.Actual', 'public.Plan', 'public.Forecast'];
+const VERSIONS = ['public.Actual', 'public.Plan', 'public.Forecast', 'public.PRUEBAS'];
 const COMMON = {
   Sociedad_CL: ['CL_BOG', 'CL_NEI', 'CL_MED'],
   Cebes_CL: ['RECOLECCION', 'BARRIDO', 'DISPOSICION', 'CORPORATIVO'],
@@ -30,17 +31,20 @@ const MODELS = {
       ...COMMON,
       Cliente: ['CLI_001', 'CLI_002', 'CLI_003'],
       Regional: ['REG_CENTRO', 'REG_NORTE'],
-      Ratio_CL: ['ING_RECOLECCION', 'ING_BARRIDO', 'ING_DISPOSICION', 'TARIFA', 'CANTIDAD'],
-      Auditoria_CL: ['PRESUPUESTO_TARIFAS', 'PXQ', 'MANUAL', 'AJUSTE', 'CALCULADO'],
+      Ratio_CL: ['ING_RECOLECCION', 'ING_BARRIDO', 'ING_DISPOSICION', 'TARIFA', 'CANTIDAD', 'TARI_RES', 'CANT_RESI', 'ING_RES'],
+      Auditoria_CL: ['PRESUPUESTO_TARIFAS', 'PXQ', 'MANUAL', 'AJUSTE', 'CALCULADO', 'Input'],
     },
   },
   CL_GASTOS: {
     name: 'Modelo Gastos Ciudad Limpia',
     dims: {
       ...COMMON,
-      Cecos_CL: ['CECO_ADMIN', 'CECO_OPER', 'VEH_ABC123', 'VEH_XYZ789'],
-      Cuentas_Egresos_CL: ['5105_SALARIOS', '5205_SERV_PUBLICOS', '5210_COMBUSTIBLE', '5260_DEPRECIACION', ...Array.from({ length: 120 }, (_, i) => `59${String(i).padStart(2, '0')}_OTROS`)],
-      Auditoria_CL: ['PRESUPUESTO_EXCEL', 'MANUAL', 'AJUSTE', 'CALCULADO'],
+      Moneda_CL: ['COP', 'USD', 'KILOMETROS'],
+      Cecos_CL: ['CECO_ADMIN', 'CECO_OPER', 'VEH_ABC123', 'VEH_XYZ789',
+        'CL01TR3001', 'CL01TR3002', 'CL01TR3003', 'CL01SG3001', 'CL01SG3002', 'CL01SG3003', 'CL01SG3004'],
+      Cuentas_Egresos_CL: ['5105_SALARIOS', '5205_SERV_PUBLICOS', '5210_COMBUSTIBLE', '5260_DEPRECIACION', 'KM_VEH', 'PCT_KM',
+        ...Array.from({ length: 120 }, (_, i) => `59${String(i).padStart(2, '0')}_OTROS`)],
+      Auditoria_CL: ['PRESUPUESTO_EXCEL', 'MANUAL', 'AJUSTE', 'CALCULADO', 'Input', 'Script', 'DIST_KM'],
     },
   },
   CL_EEFF: {
@@ -88,6 +92,114 @@ Object.assign(MODELS, {
   },
 });
 const MODEL_PREFIX = { ciudadlimpia: 'CL_', fanalca: 'FN_' };
+
+// IDs reales de los modelos en SAC -> modelo simulado (para que los casos de prueba
+// guardados con los IDs reales también funcionen en el modo demostración)
+const MODEL_ALIASES = {
+  Cdtrt4eesot3vn57g9a9ve57v5o: 'CL_INGRESOS', Cl2fsrpi6n57id7iqdnck2m2p5t: 'CL_GASTOS', Cmnpu7ouleh31l4491314lip574: 'CL_EEFF',
+  Couh7ojg5e54rh2d4udijq6o83k: 'FN_INGRESOS', Cunejii8r2d7vr4ldq2ousgfg7f: 'FN_GASTOS', C2kgen7fqc13vleoibl06hk4j7o: 'FN_EEFF',
+};
+
+// Propiedades de miembros (para elegir miembros al azar con filtro)
+const PROPS = {
+  Cecos_CL: {
+    CL01TR3001: { EMISOR: 'Y' }, CL01TR3002: { EMISOR: 'Y' }, CL01TR3003: { EMISOR: 'Y' },
+    CL01SG3001: { RECEPTOR: 'Y' }, CL01SG3002: { RECEPTOR: 'Y' }, CL01SG3003: { RECEPTOR: 'Y' }, CL01SG3004: { RECEPTOR: 'Y' },
+  },
+};
+
+// ------------------------------------------------------------ data actions simulados (multi actions)
+// Cada uno recibe el almacén de hechos del modelo y la versión destino.
+const keyCols = (modelId) => metadataOf(modelId).factData.keys;
+const rowKey = (modelId, r) => keyCols(modelId).map((c) => r[c]).join('|');
+function upsert(store, modelId, row) { store.set(rowKey(modelId, row), row); }
+
+function pxq({ ratioDim, price, qty, result, round = (x) => x }) {
+  return (store, modelId, version) => {
+    for (const [k, r] of store) if (r.Version === version && r[ratioDim] === result) store.delete(k);
+    const q = new Map();
+    for (const r of store.values()) if (r.Version === version && r[ratioDim] === qty) q.set(rowKey(modelId, { ...r, [ratioDim]: '' }), r.Importe);
+    for (const r of [...store.values()]) {
+      if (r.Version !== version || r[ratioDim] !== price) continue;
+      const n = q.get(rowKey(modelId, { ...r, [ratioDim]: '' }));
+      if (n !== undefined) upsert(store, modelId, { ...r, [ratioDim]: result, Importe: round(r.Importe) * n });
+    }
+  };
+}
+
+// Distribución de gastos por kilómetros (data action CL_DISTRIB_KM)
+function distribKm(store, modelId, version) {
+  const P = PROPS.Cecos_CL;
+  for (const [k, r] of store) if (r.Version === version && r.Auditoria_CL === 'DIST_KM') store.delete(k);
+  const by = (r) => `${r.Date}|${r.Sociedad_CL}`;
+  const km = new Map(); const pool = new Map();
+  for (const r of store.values()) {
+    if (r.Version !== version) continue;
+    if (r.Cuentas_Egresos_CL === 'KM_VEH' && r.Moneda_CL === 'KILOMETROS' && r.Auditoria_CL === 'Script' && P[r.Cecos_CL]?.RECEPTOR === 'Y') {
+      if (!km.has(by(r))) km.set(by(r), []);
+      km.get(by(r)).push(r);
+    }
+  }
+  const salidas = [];
+  for (const r of store.values()) {
+    if (r.Version !== version || r.Moneda_CL !== 'COP' || P[r.Cecos_CL]?.EMISOR !== 'Y') continue;
+    const total = (km.get(by(r)) || []).reduce((a, x) => a + x.Importe, 0);
+    if (!(total > 0)) continue;
+    const pk = `${by(r)}|${r.Cuentas_Egresos_CL}`;
+    pool.set(pk, (pool.get(pk) || 0) + r.Importe);
+    salidas.push({ ...r, Auditoria_CL: 'DIST_KM', Importe: -r.Importe });
+  }
+  for (const s of salidas) {
+    const k = rowKey(modelId, s); const prev = store.get(k);
+    store.set(k, prev ? { ...prev, Importe: prev.Importe + s.Importe } : s);
+  }
+  for (const [pk, amount] of pool) {
+    const [date, soc, cuenta] = pk.split('|');
+    const list = km.get(`${date}|${soc}`);
+    const total = list.reduce((a, x) => a + x.Importe, 0);
+    for (const r of list) {
+      upsert(store, modelId, { ...r, Cuentas_Egresos_CL: 'PCT_KM', Auditoria_CL: 'DIST_KM', Importe: r.Importe / total });
+      const row = { ...r, Cuentas_Egresos_CL: cuenta, Moneda_CL: 'COP', Auditoria_CL: 'DIST_KM', Importe: amount * r.Importe / total };
+      const k = rowKey(modelId, row); const prev = store.get(k);
+      store.set(k, prev ? { ...prev, Importe: prev.Importe + row.Importe } : row);
+    }
+  }
+}
+
+const MULTI_ACTIONS = {
+  't.DEMO:CL_PXQ': { model: 'CL_INGRESOS', run: pxq({ ratioDim: 'Ratio_CL', price: 'TARI_RES', qty: 'CANT_RESI', result: 'ING_RES' }) },
+  't.DEMO:CL_DISTRIB_KM': { model: 'CL_GASTOS', run: distribKm },
+  't.DEMO:FN_PXQ': { model: 'FN_INGRESOS', run: pxq({ ratioDim: 'Ratio', price: 'PRECIO', qty: 'UNIDADES', result: 'ING_VENTAS_NAL' }) },
+  // Versión con un error a propósito: redondea el precio a miles antes de multiplicar
+  't.DEMO:FN_PXQ_ERROR': { model: 'FN_INGRESOS', run: pxq({ ratioDim: 'Ratio', price: 'PRECIO', qty: 'UNIDADES', result: 'ING_VENTAS_NAL', round: (x) => Math.round(x / 1000) * 1000 }) },
+};
+
+// $filter de OData con la forma que genera el probador: A eq 'x' and (B eq 'y' or B eq 'z') ...
+function splitTop(str, word) {
+  const out = []; let depth = 0; let inQ = false; let cur = '';
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (ch === "'") inQ = !inQ;
+    if (!inQ && ch === '(') depth++;
+    if (!inQ && ch === ')') depth--;
+    if (!inQ && depth === 0 && str.startsWith(` ${word} `, i)) { out.push(cur); cur = ''; i += word.length + 1; continue; }
+    cur += ch;
+  }
+  out.push(cur);
+  return out.map((x) => x.trim());
+}
+function parseFilter(f) {
+  if (!f) return () => true;
+  const groups = splitTop(f, 'and').map((g) => {
+    const inner = g.replace(/^\((.*)\)$/s, '$1');
+    return splitTop(inner, 'or').map((t) => {
+      const m = t.match(/^(\w+) eq '((?:[^']|'')*)'$/);
+      if (!m) throw new Error(`Filtro no soportado por el simulador: ${t}`);
+      return [m[1], m[2].replace(/''/g, "'")];
+    });
+  });
+  return (row) => groups.every((ors) => ors.some(([d, v]) => String(row[d]) === v));
+}
 
 function metadataOf(modelId) {
   const m = MODELS[modelId];
@@ -210,6 +322,7 @@ ${q.err ? '<div class="err">Usuario o contraseña incorrectos.</div>' : ''}
     return next();
   }
   function model(req, res, next) {
+    if (MODEL_ALIASES[req.params.modelId]) req.params.modelId = MODEL_ALIASES[req.params.modelId];
     if (!MODELS[req.params.modelId]) return res.status(404).json({ error: { message: `Model ${req.params.modelId} not found` } });
     return next();
   }
@@ -331,20 +444,64 @@ ${q.err ? '<div class="err">Usuario o contraseña incorrectos.</div>' : ''}
     res.json({ message: 'Job deleted' });
   });
 
-  // ------------------------------------------------------------ Data Export API (maestros)
+  // ------------------------------------------------------------ Data Export API (FactData y maestros)
   const PAGE = 50;
+  app.get('/api/v1/dataexport/providers/sac/:modelId/FactData', auth, model, (req, res) => {
+    let match;
+    try { match = parseFilter(req.query.$filter); } catch (e) { return res.status(400).json({ error: { message: e.message } }); }
+    const rows = [...(facts.get(req.params.modelId) || new Map()).values()].filter(match);
+    const skip = Number(req.query.$skip || 0);
+    const out = { value: rows.slice(skip, skip + PAGE) };
+    if (skip + PAGE < rows.length) {
+      const q = new URLSearchParams(req.query); q.set('$skip', String(skip + PAGE));
+      out['@odata.nextLink'] = `FactData?${q}`;
+    }
+    return res.json(out);
+  });
+
   app.get('/api/v1/dataexport/providers/sac/:modelId/:master', auth, model, (req, res) => {
     const dim = req.params.master.replace(/Master$/, '');
     const list = dim === 'Version' ? VERSIONS : MODELS[req.params.modelId].dims[dim];
     if (!list) return res.status(404).json({ error: { message: `Entity ${req.params.master} not found` } });
     const skip = Number(req.query.$skip || 0);
-    const page = list.slice(skip, skip + PAGE).map((id) => ({ ID: id, Description: id }));
+    const page = list.slice(skip, skip + PAGE).map((id) => ({ ID: id, Description: id, ...(PROPS[dim]?.[id] || {}) }));
     const out = { value: page };
     if (skip + PAGE < list.length) {
       const q = new URLSearchParams(req.query); q.set('$skip', String(skip + PAGE));
       out['@odata.nextLink'] = `${req.params.master}?${q}`;
     }
     return res.json(out);
+  });
+
+  // ------------------------------------------------------------ API de multi actions
+  const executions = new Map();
+  app.get('/api/v1/csrf', auth, (req, res) => res.status(200).end());
+  app.post('/api/v1/multiActions/:id/executions', auth, csrf, (req, res) => {
+    const ma = MULTI_ACTIONS[req.params.id];
+    if (!ma || !MODELS[ma.model].name) return res.status(404).json({ messages: [{ code: '596000996', severity: 'error', message: 'The resource does not exist or you do not have permission to read it.' }] });
+    if (req.user.readOnly) return res.status(403).json({ messages: [{ code: '596000998', severity: 'error', message: `You are not authorized to execute MULTIACTIONS ${req.params.id}` }] });
+    const params = Array.isArray(req.body?.parameterValues) ? req.body.parameterValues : null;
+    if (!params) return res.status(400).json({ messages: [{ code: '599000999', severity: 'error', message: 'Invalid request. Please provide a valid request body.' }] });
+    const version = params.find((p) => p.parameterId === 'TargetVersion')?.value?.memberIds?.[0] || 'public.Plan';
+    const executionId = crypto.randomBytes(16).toString('hex').toUpperCase();
+    const exec = { id: executionId, owner: req.user.username, status: 'running', polls: 0, messages: [] };
+    if (!VERSIONS.includes(version)) {
+      exec.status = 'failed';
+      exec.messages.push({ code: '501000515', severity: 'error', message: `Member "${version}" does not exist in the dimension or selected hierarchy or is hidden.`, details: [{ parameterId: 'TargetVersion' }] });
+    } else {
+      const store = facts.get(ma.model) || new Map();
+      ma.run(store, ma.model, version);
+      facts.set(ma.model, store);
+    }
+    executions.set(executionId, exec);
+    return res.status(202).json({ executionId, links: [{ href: `/${req.params.id}/executions/${executionId}`, rel: 'STATUS' }] });
+  });
+  app.get('/api/v1/multiActions/:id/executions/:execId', auth, (req, res) => {
+    const e = executions.get(req.params.execId);
+    if (!e || e.owner !== req.user.username) return res.status(404).json({ messages: [{ code: '596000996', severity: 'error', message: 'The resource does not exist or you do not have permission to read it.' }] });
+    e.polls += 1;
+    if (e.status === 'running' && e.polls >= 2) e.status = 'successful';
+    return res.json({ executionId: e.id, status: e.status, utcStartDate: new Date().toISOString(), executionResult: { messages: e.messages } });
   });
 
   return {
@@ -354,4 +511,4 @@ ${q.err ? '<div class="err">Usuario o contraseña incorrectos.</div>' : ''}
   };
 }
 
-module.exports = { createMockSac, metadataOf, MODELS, VERSIONS, CLIENT_ID, CLIENT_SECRET };
+module.exports = { createMockSac, metadataOf, MODELS, VERSIONS, MULTI_ACTIONS, CLIENT_ID, CLIENT_SECRET };

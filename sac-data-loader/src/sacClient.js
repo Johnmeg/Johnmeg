@@ -86,6 +86,15 @@ class SacClient {
     return token;
   }
 
+  // Token CSRF para la API de multi actions (GET /api/v1/csrf, documentado por SAP)
+  async fetchCsrfMultiActions() {
+    const res = await this.raw('GET', `${this.tenant}/api/v1/csrf`, { headers: { 'x-csrf-token': 'fetch' } });
+    const token = res.headers.get('x-csrf-token');
+    if (!token) return this.fetchCsrf(); // algunos tenants sólo lo entregan en otros endpoints
+    this.state.csrfMA = token;
+    return token;
+  }
+
   async raw(method, url, { headers = {}, body } = {}) {
     const token = await this.getToken();
     const h = { Authorization: `Bearer ${token}`, Accept: 'application/json', ...headers };
@@ -103,7 +112,8 @@ class SacClient {
   async call(method, url, { json, csrf = false, allow404 = false } = {}) {
     for (let attempt = 0; attempt < 2; attempt++) {
       const headers = {};
-      if (csrf) headers['x-csrf-token'] = this.state.csrf || await this.fetchCsrf();
+      if (csrf === 'ma') headers['x-csrf-token'] = this.state.csrfMA || await this.fetchCsrfMultiActions();
+      else if (csrf) headers['x-csrf-token'] = this.state.csrf || await this.fetchCsrf();
       let body;
       if (json !== undefined) { headers['Content-Type'] = 'application/json'; body = JSON.stringify(json); }
 
@@ -113,7 +123,7 @@ class SacClient {
         throw new SacError(401, FRIENDLY[401]);
       }
       if (csrf && res.status === 403 && /required/i.test(res.headers.get('x-csrf-token') || '') && attempt === 0) {
-        this.state.csrf = null;
+        if (csrf === 'ma') this.state.csrfMA = null; else this.state.csrf = null;
         continue;
       }
       const text = await res.text();
@@ -123,7 +133,8 @@ class SacClient {
       if (text) { try { data = JSON.parse(text); } catch { data = { raw: text }; } }
       if (res.status === 404 && allow404) return null;
       if (!res.ok) {
-        const sacMsg = data?.error?.message || data?.message || (typeof data?.raw === 'string' ? data.raw.slice(0, 300) : '');
+        const sacMsg = data?.error?.message || data?.message || data?.messages?.map((m) => m.message).join(' | ')
+          || (typeof data?.raw === 'string' ? data.raw.slice(0, 300) : '');
         const base = FRIENDLY[res.status] || `SAC respondió con error ${res.status}.`;
         throw new SacError(res.status, sacMsg ? `${base} Detalle de SAC: ${sacMsg}` : base, data);
       }
@@ -205,5 +216,59 @@ class SacClient {
     return ids;
   }
 }
+
+// <paquete>:<ID> tal cual (los dos puntos sin codificar, como en la documentación de SAP)
+const maPath = (id) => encodeURIComponent(id).replace(/%3A/gi, ':');
+
+Object.assign(SacClient.prototype, {
+  // ------------------------------------------------------------ multi actions (API pública, SAC 2023.15+)
+  // https://help.sap.com/docs/SAP_ANALYTICS_CLOUD/14cac91febef464dbb1efce20e3f1613/80680a8a1ca4460caad7f54675abc091.html
+  async runMultiAction(multiActionId, parameterValues = []) {
+    const data = await this.call('POST', `${this.tenant}/api/v1/multiActions/${maPath(multiActionId)}/executions`,
+      { json: { parameterValues }, csrf: 'ma' });
+    const executionId = data?.executionId || data?.executionID;
+    if (!executionId) throw new SacError(500, `SAC no devolvió el identificador de la ejecución: ${JSON.stringify(data)?.slice(0, 200)}`, data);
+    return executionId;
+  },
+
+  async multiActionStatus(multiActionId, executionId) {
+    return this.call('GET', `${this.tenant}/api/v1/multiActions/${maPath(multiActionId)}/executions/${encodeURIComponent(executionId)}`);
+  },
+
+  // ------------------------------------------------------------ datos (Data Export API, FactData)
+  async getFactData(modelId, filter, { maxRows = 200000 } = {}) {
+    const base = this.exportUrl(`/providers/sac/${encodeURIComponent(modelId)}/FactData`);
+    let url = `${base}?$filter=${encodeURIComponent(filter)}`;
+    const rows = [];
+    let data = await this.call('GET', url);
+    while (data) {
+      rows.push(...(data.value || []));
+      if (rows.length > maxRows) throw new SacError(413, `La lectura de resultados supera ${maxRows} filas; acote el caso de prueba.`);
+      const next = data['@odata.nextLink'];
+      if (!next) break;
+      url = new URL(next, base).toString(); // nextLink relativo al proveedor
+      data = await this.call('GET', url);
+    }
+    return rows;
+  },
+
+  // Maestro completo de una dimensión (con propiedades), para elegir miembros al azar.
+  async getMasterRows(modelId, dimension, { maxRows = 50000 } = {}) {
+    const base = this.exportUrl(`/providers/sac/${encodeURIComponent(modelId)}/${encodeURIComponent(`${dimension}Master`)}`);
+    let url = base;
+    const rows = [];
+    let data = await this.call('GET', url, { allow404: true });
+    if (data === null) return null;
+    while (data) {
+      rows.push(...(data.value || []));
+      if (rows.length > maxRows) break;
+      const next = data['@odata.nextLink'];
+      if (!next) break;
+      url = new URL(next, base).toString();
+      data = await this.call('GET', url);
+    }
+    return rows;
+  },
+});
 
 module.exports = { SacClient, SacError, findJobId };

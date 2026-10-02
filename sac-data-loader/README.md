@@ -206,13 +206,78 @@ src/periods.js          periodos → YYYYMM
 src/meta.js             metadata del modelo
 src/config.js, audit.js configuración y auditoría
 src/brand.js            marca (BRAND): textos, logos, colores y modelos
-public/                 interfaz (HTML/CSS/JS sin dependencias)
+src/tester/             probador de data actions (motor y ejecución contra SAC)
+public/                 interfaz (HTML/CSS/JS sin dependencias): cargador (index) y probador (pruebas)
 brands/                 una carpeta por empresa (ciudadlimpia, fanalca)
 config/templates.json   modelos de Ciudad Limpia (Gastos, Ingreso, EEFF) y otro modelo
 deploy/windows-usuario/ instalador para el computador del usuario (ZIP y .exe)
 test/                   pruebas y SAC simulado
 samples/                archivos de ejemplo
 ```
+
+## 9. Probador de data actions (`/pruebas`)
+
+Pantalla **Probar data actions**, en el menú superior. Prueba un data action con datos aleatorios en pocos segundos, sin construir historias ni cargar archivos a mano. Por cada prueba:
+
+1. **Valida la definición** del caso y **lee la estructura del modelo**.
+2. **Resuelve los miembros**: listas fijas, miembros **al azar** del maestro (también filtrados por propiedad, por ejemplo `EMISOR = Y`) o los mismos de otra entrada (`@ENTRADA`). Verifica que todos existan.
+3. **Genera datos aleatorios** reproducibles (con la misma **semilla**, los mismos datos) y calcula los **valores esperados** con la fórmula del caso.
+4. **Limpia y carga** las entradas en la **versión de pruebas** con *CleanAndReplace* (alcance `Version + Date` por defecto). Usa el Data Import API, como el cargador.
+5. **Ejecuta la multi action** que contiene el data action, con la API pública de SAC (`POST /api/v1/multiActions/<paquete>:<ID>/executions`), y espera a que termine (`GET …/executions/<id>`).
+6. **Lee los resultados** con el Data Export API (`FactData` filtrado por versión, periodos y miembros).
+7. **Compara** celda por celda con una tolerancia. Muestra las diferencias, los mensajes de SAC y descarga un CSV.
+
+Con **Repeticiones** corre el mismo caso varias veces con semillas distintas. **Vista previa** hace los pasos 1 a 3 sin escribir nada en SAC.
+
+### Preparación en SAC (una vez)
+- **Versión de pruebas** pública en cada modelo, por ejemplo `public.PRUEBAS`. La prueba **borra sus datos** en los periodos del caso antes de cargar. Las versiones de `BLOCKED_VERSIONS` (`public.Actual`) se rechazan.
+- **Multi action por data action**: SAC no tiene API pública para ejecutar un data action directamente. Cree una multi action con un paso *Data Action* y exponga el parámetro de versión, por ejemplo `TargetVersion`. Su ID tiene la forma `<paquete>:<ID>` (ejemplo de SAP: `t.TEST:CEEFOKMRUKJBY5BN47F1NS2L8G`); el ID del objeto aparece en la URL del navegador al abrir la multi action.
+- **Cliente OAuth**: el mismo del cargador (*Interactive Usage*). SAP indica que la API de multi actions se usa con un usuario de negocio y no admite *client credentials*.
+- **Permisos** del usuario: escribir en el modelo y ejecutar la multi action.
+
+### Definición del caso (JSON)
+```json
+{
+  "id": "FN_PXQ_VENTAS", "nombre": "P×Q ventas",
+  "modelo": "Couh7ojg5e54rh2d4udijq6o83k",
+  "multiAction": "t.XXXX:CXXXXXXXXXXXXXXXXXXXXXXXX",
+  "version": "public.PRUEBAS",
+  "periodos": { "desde": "202601", "hasta": "202603" },
+  "comun": { "Auditoria": "PRESUPUESTO_EXCEL", "Moneda": "COP" },
+  "parametros": [ { "parameterId": "TargetVersion", "value": { "memberIds": ["{{version}}"], "hierarchyId": null } } ],
+  "entradas": [
+    { "nombre": "PRECIO", "fijo": { "Ratio": "PRECIO" }, "variar": { "Sociedades": { "aleatorio": 1 }, "Cebes": { "aleatorio": 2 } }, "min": 5000000, "max": 15000000, "decimales": 0 },
+    { "nombre": "UNIDADES", "fijo": { "Ratio": "UNIDADES" }, "variar": { "Sociedades": "@PRECIO", "Cebes": "@PRECIO" }, "min": 10, "max": 2000, "decimales": 0 }
+  ],
+  "esperado": [
+    { "nombre": "VENTAS", "fijo": { "Ratio": "ING_VENTAS_NAL" }, "variar": { "Sociedades": "@PRECIO", "Cebes": "@PRECIO" }, "formula": "v('PRECIO') * v('UNIDADES')" }
+  ],
+  "tolerancia": 0.01
+}
+```
+
+| Campo | Uso |
+|---|---|
+| `comun` / `fijo` | Miembros fijos (para todas las celdas / para un grupo). Las dimensiones que no se indiquen se cargan con `#` |
+| `variar` | Lista de miembros, `{ "aleatorio": n, "filtro": { "PROPIEDAD": "valor" } }` o `"@ENTRADA"` |
+| `parametros` | `parameterValues` de la multi action. `{{version}}` se reemplaza por la versión del caso; `"{{periodos}}"` dentro de `memberIds` se reemplaza por los periodos |
+| `limpieza.alcance` | Dimensiones del *CleanAndReplace* (por defecto `["Version", "Date"]`) |
+| `esperaMaxSeg` | Tiempo máximo de espera de la multi action (por defecto 600) |
+
+**Funciones de las fórmulas** (se calculan por celda esperada):
+
+| Función | Valor |
+|---|---|
+| `v('ENTRADA')` | Valor de la entrada en el mismo periodo y con los mismos miembros en las dimensiones que esa entrada varía |
+| `sum('ENTRADA', { Dim: 'x' })` | Suma de la entrada en el mismo periodo (filtro opcional, por ejemplo `{ Cuentas_Egresos_CL: c.Cuentas_Egresos_CL }`) |
+| `c.<Dimensión>`, `c.Date` | Miembros de la celda que se calcula |
+| `round(x, dec)`, `abs`, `min`, `max`, `pow`, `sqrt`, `Math` | Funciones numéricas |
+
+Ejemplos incluidos, en `brands/<marca>/pruebas.json`: **P×Q de residuos** y **distribución de gastos por km** (Ciudad Limpia; emisores y receptores al azar por las propiedades `EMISOR` y `RECEPTOR`), **P×Q de ventas** y un **data action con un error a propósito** (Fanalca). Los modelos usan sus IDs reales. Reemplace `multiAction` por el de su multi action y los códigos de miembros por los suyos: los IDs `t.DEMO:…` solo existen en el modo demostración.
+
+**Limitaciones:** la versión de pruebas debe ser pública; la lectura agrega las dimensiones que el resultado no indica; si el parámetro de fecha de la multi action usa jerarquía, los `memberIds` deben ser rutas (vea el ejemplo de SAP).
+
+Fuentes: [API de multi actions (SAP Help)](https://help.sap.com/docs/SAP_ANALYTICS_CLOUD/14cac91febef464dbb1efce20e3f1613/e5ade1ed7c274d929a18bcc859102c40.html), [iniciar una ejecución](https://help.sap.com/docs/SAP_ANALYTICS_CLOUD/14cac91febef464dbb1efce20e3f1613/80680a8a1ca4460caad7f54675abc091.html), [estado de la ejecución](https://help.sap.com/docs/SAP_ANALYTICS_CLOUD/14cac91febef464dbb1efce20e3f1613/ff7815c62f284af890ef4d21f06ff460.html), [Introduction of SAC Multi Actions Public API (SAP Community)](https://community.sap.com/t5/technology-blog-posts-by-sap/introduction-of-sac-multi-actions-public-api/ba-p/13577173), [Data Export API (SAP Community)](https://community.sap.com/t5/technology-blog-posts-by-sap/data-export-api-a-tour-of-the-api/ba-p/13567104).
 
 ## Referencias
 

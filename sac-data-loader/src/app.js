@@ -14,6 +14,8 @@ const { buildMeta, ConfigError } = require('./meta');
 const { validate, norm } = require('./validator');
 const loader = require('./loader');
 const { loadBrand, renderIndex } = require('./brand');
+const tester = require('./tester/runner');
+const { CaseError } = require('./tester/engine');
 
 // Servidor web: inicio de sesión OAuth por usuario, validación local del
 // archivo, validación en SAC y carga (Data Import API) en dos pasos.
@@ -74,7 +76,9 @@ function createApp(cfg, { audit = () => {}, logger = console } = {}) {
   const brand = cfg.brand || loadBrand();
   const publicDir = path.join(__dirname, '..', 'public');
   const indexHtml = renderIndex(fs.readFileSync(path.join(publicDir, 'index.html'), 'utf8'), brand);
+  const testsHtml = renderIndex(fs.readFileSync(path.join(publicDir, 'pruebas.html'), 'utf8'), brand);
   app.get(['/', '/index.html'], (req, res) => res.type('html').send(indexHtml));
+  app.get(['/pruebas', '/pruebas.html'], (req, res) => res.type('html').send(testsHtml));
   app.get('/brand/theme.css', (req, res) => res.type('css').sendFile(path.join(brand.dir, 'theme.css')));
   app.use('/brand/img', express.static(path.join(brand.dir, 'img'), { index: false }));
   app.use(express.static(publicDir, { index: false }));
@@ -91,6 +95,7 @@ function createApp(cfg, { audit = () => {}, logger = console } = {}) {
       }
     }
     for (const [k, m] of memberCache) if (now - m.at > MEMBER_TTL_MS) memberCache.delete(k);
+    for (const [k, r] of testRuns) if (r.state === 'DONE' && now - r.createdAt > 2 * 60 * 60 * 1000) testRuns.delete(k);
   }, 60 * 1000);
   sweeper.unref();
 
@@ -202,7 +207,9 @@ function createApp(cfg, { audit = () => {}, logger = console } = {}) {
   app.get('/auth/login', (req, res) => {
     const state = oauth.randomToken();
     const pkce = cfg.sac.usePkce ? oauth.pkcePair() : null;
-    req.session.oauth = { state, verifier: pkce?.verifier || null, at: Date.now() };
+    // Página a la que se vuelve después del login (sólo rutas propias conocidas)
+    const next = req.query.next === '/pruebas' ? '/pruebas' : '/';
+    req.session.oauth = { state, verifier: pkce?.verifier || null, at: Date.now(), next };
     res.redirect(oauth.buildAuthorizeUrl(cfg, { state, codeChallenge: pkce?.challenge }));
   });
 
@@ -221,13 +228,14 @@ function createApp(cfg, { audit = () => {}, logger = console } = {}) {
       return res.redirect(`/?error=${encodeURIComponent('SAC no aceptó el inicio de sesión. Verifique la configuración del cliente OAuth.')}`);
     }
     const user = oauth.userFromTokens(tokens);
+    const next = pending.next === '/pruebas' ? '/pruebas' : '/';
     // Nueva sesión tras autenticarse (evita fijación de sesión)
     await new Promise((resolve, reject) => req.session.regenerate((err) => (err ? reject(err) : resolve())));
     const vaultKey = oauth.randomToken();
     vault.set(vaultKey, { tokens, user, sac: { csrf: null, cookies: {} }, lastSeen: Date.now(), refreshing: null });
     req.session.vaultKey = vaultKey;
     audit({ event: 'LOGIN', user: user.id });
-    return res.redirect('/');
+    return res.redirect(next);
   }));
 
   app.post('/auth/logout', requireAjax, (req, res) => {
@@ -493,6 +501,87 @@ function createApp(cfg, { audit = () => {}, logger = console } = {}) {
     res.json({ ok: true });
   }));
 
+  // ------------------------------------------------------------ probador de data actions
+  const testRuns = new Map(); // runId -> { vaultKey, state, reports, current, ... }
+  const catalogFile = path.join(brand.dir, 'pruebas.json');
+  function loadCatalog() {
+    try { return JSON.parse(fs.readFileSync(catalogFile, 'utf8')); } catch { return { casos: [] }; }
+  }
+
+  app.get('/api/tests/catalog', requireAuth, (req, res) => {
+    const cat = loadCatalog();
+    res.json({ casos: Array.isArray(cat.casos) ? cat.casos : [], plantilla: cat.plantilla || null, blockedVersions: cfg.blockedVersions });
+  });
+
+  function caseFromBody(body) {
+    const c = body?.case;
+    if (!c || typeof c !== 'object' || Array.isArray(c)) throw new CaseError('Envíe la definición del caso de prueba (JSON).');
+    if (JSON.stringify(c).length > 200000) throw new CaseError('La definición del caso es demasiado grande.');
+    return c;
+  }
+  const seedOf = (x) => (Number.isInteger(Number(x)) && Number(x) > 0 ? Number(x) : Math.floor(Math.random() * 1e9) + 1);
+
+  app.post('/api/tests/preview', requireAjax, requireAuth, wrap(async (req, res) => {
+    const report = await tester.runCase(clientFor(req.auth), caseFromBody(req.body), {
+      seed: seedOf(req.body.seed), blockedVersions: cfg.blockedVersions, preview: true,
+    });
+    res.json(report);
+  }));
+
+  app.post('/api/tests/run', requireAjax, requireAuth, wrap(async (req, res) => {
+    const raw = caseFromBody(req.body);
+    if (req.body.confirmVersion !== true) {
+      return res.status(400).json({ error: 'Confirme que la versión es de pruebas: la prueba borra los datos de su alcance antes de cargar.' });
+    }
+    for (const r of testRuns.values()) {
+      if (r.vaultKey === req.vaultKey && r.state === 'RUNNING') return res.status(409).json({ error: 'Ya tiene una prueba en curso; espere a que termine.' });
+    }
+    const reps = Math.min(Math.max(Number.parseInt(req.body.repeticiones, 10) || 1, 1), 20);
+    const seed = seedOf(req.body.seed);
+    const runId = crypto.randomBytes(12).toString('hex');
+    const run = { vaultKey: req.vaultKey, state: 'RUNNING', reps, seed, reports: [], current: null, createdAt: Date.now() };
+    testRuns.set(runId, run);
+    const entry = req.auth;
+    (async () => {
+      for (let i = 0; i < reps; i++) {
+        const report = await tester.runCase(clientFor(entry), raw, {
+          seed: seed + i, blockedVersions: cfg.blockedVersions, chunkSize: cfg.chunkSize,
+          onUpdate: (r) => { run.current = r; },
+        });
+        run.reports.push(report);
+        run.current = null;
+        audit({
+          event: 'PRUEBA_DATA_ACTION', user: entry.user.id, caso: report.case?.id || raw.id, modelId: report.case?.modelo,
+          multiAction: report.case?.multiAction, version: report.case?.version, seed: report.seed, state: report.state,
+          cells: report.summary?.cells ?? null, failed: report.summary?.failed ?? null, ms: report.ms,
+        });
+        if (report.state !== 'PASSED' && req.body.detenerEnFallo !== false) break;
+      }
+      run.state = 'DONE';
+    })().catch((e) => { run.state = 'DONE'; run.error = e.message; });
+    res.status(202).json({ runId, seed, repeticiones: reps });
+  }));
+
+  function getRun(req, res) {
+    const run = testRuns.get(String(req.params.runId || ''));
+    if (!run || run.vaultKey !== req.vaultKey) { res.status(404).json({ error: 'La prueba no existe o expiró.' }); return null; }
+    return run;
+  }
+
+  app.get('/api/tests/status/:runId', requireAuth, (req, res) => {
+    const run = getRun(req, res);
+    if (!run) return;
+    const slim = (r) => r && ({ ...r, groups: r.groups.map((g) => ({ ...g, cells: g.cells.slice(0, 2000) })) });
+    res.json({ state: run.state, reps: run.reps, seed: run.seed, error: run.error || null, current: slim(run.current), reports: run.reports.map(slim) });
+  });
+
+  app.get('/api/tests/report/:runId', requireAuth, (req, res) => {
+    const run = getRun(req, res);
+    if (!run) return;
+    res.set('Content-Disposition', `attachment; filename="prueba-data-action-${run.seed}.csv"`);
+    res.type('text/csv; charset=utf-8').send(tester.reportCsv(run.reports));
+  });
+
   // ------------------------------------------------------------ errores
   app.use('/api', (req, res) => res.status(404).json({ error: 'Ruta no encontrada.' }));
 
@@ -503,7 +592,7 @@ function createApp(cfg, { audit = () => {}, logger = console } = {}) {
       return res.status(413).json({ error: msg });
     }
     if (err instanceof ParseError) return res.status(422).json({ error: err.message, code: err.code });
-    if (err instanceof ConfigError) return res.status(422).json({ error: err.message });
+    if (err instanceof ConfigError || err instanceof CaseError) return res.status(422).json({ error: err.message });
     if (err instanceof SacError) {
       if (err.status === 401) vault.delete(req.session?.vaultKey);
       return res.status(err.status === 401 ? 401 : 502).json({ error: err.message, sacStatus: err.status });

@@ -66,6 +66,9 @@
 .topbar-inner { min-height: 96px; }
 .logo-color { display: none; }
 .logo-white { display: block; }
+.appnav a { color: #fff; font-stretch: normal; font-weight: 400; letter-spacing: .08em; font-size: 14px; }
+.appnav a:hover { border-color: rgba(255, 255, 255, .4); }
+.appnav a[aria-current="page"] { border-color: transparent; border-bottom-color: var(--accent); border-radius: 0; }
 .app-name {
   color: #fff; font-stretch: normal; font-weight: 400; letter-spacing: .08em; font-size: 16px;
 }
@@ -103,6 +106,7 @@ th { background: var(--brand-800); }
 @media (max-width: 640px) {
   .topbar-inner { min-height: 72px; }
   .app-name { font-size: 13px; letter-spacing: .05em; }
+  .appnav a { font-size: 12px; letter-spacing: .04em; }
   .hero-title { font-size: 30px; }
   .card h2 { font-size: 22px; }
 }

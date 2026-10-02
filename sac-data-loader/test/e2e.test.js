@@ -292,3 +292,62 @@ test('logout y token revocado cierran la sesión', async (t) => {
   assert.match(r.body.error, /expiró/);
   assert.equal((await other.json('GET', '/api/me')).body.authenticated, false);
 });
+
+test('e2e: probador de data actions por la API (vista previa, ejecución, CSV y aislamiento)', async () => {
+  const stack = await startStack();
+  try {
+    const { json, go } = await login(stack);
+    const cat = await json('GET', '/api/tests/catalog');
+    assert.equal(cat.status, 200);
+    const caso = cat.body.casos.find((c) => c.id === 'CL_PXQ_RESIDUOS');
+    assert.ok(caso);
+
+    const page = await go(`${stack.appUrl}/pruebas`);
+    assert.match(await page.text(), /Probador de data actions/);
+
+    const noConfirm = await json('POST', '/api/tests/run', { case: caso, seed: 9 });
+    assert.equal(noConfirm.status, 400);
+    assert.match(noConfirm.body.error, /versión es de pruebas/);
+
+    const prev = await json('POST', '/api/tests/preview', { case: caso, seed: 9 });
+    assert.equal(prev.status, 200);
+    assert.equal(prev.body.state, 'PREVIEW');
+
+    const bad = await json('POST', '/api/tests/preview', { case: 'texto' });
+    assert.equal(bad.status, 422);
+
+    const run = await json('POST', '/api/tests/run', { case: caso, seed: 9, repeticiones: 2, confirmVersion: true });
+    assert.equal(run.status, 202);
+    let st;
+    for (let i = 0; i < 100; i++) {
+      st = await json('GET', `/api/tests/status/${run.body.runId}`);
+      if (st.body.state === 'DONE') break;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    assert.equal(st.body.state, 'DONE');
+    assert.deepEqual(st.body.reports.map((r) => [r.seed, r.state]), [[9, 'PASSED'], [10, 'PASSED']]);
+    const csv = await go(`${stack.appUrl}/api/tests/report/${run.body.runId}`);
+    assert.match(csv.headers.get('content-type'), /text\/csv/);
+    assert.match(await csv.text(), /CL_PXQ_RESIDUOS;10;INGRESO;/);
+    assert.ok(stack.events.some((e) => e.event === 'PRUEBA_DATA_ACTION' && e.state === 'PASSED'));
+
+    const other = await login(stack, 'luis');
+    assert.equal((await other.json('GET', `/api/tests/status/${run.body.runId}`)).status, 404);
+  } finally { stack.close(); }
+});
+
+test('e2e: el inicio de sesión desde el probador vuelve al probador', async () => {
+  const stack = await startStack();
+  try {
+    const go = browser();
+    const r1 = await go(`${stack.appUrl}/auth/login?next=/pruebas`);
+    const authUrl = new URL(r1.headers.get('location'));
+    const form = new URLSearchParams(Object.fromEntries(authUrl.searchParams));
+    form.set('username', 'ana'); form.set('password', 'demo');
+    const r2 = await go(`${stack.sacUrl}/oauth/authorize`, { method: 'POST', body: form });
+    const r3 = await go(r2.headers.get('location'));
+    assert.equal(r3.headers.get('location'), '/pruebas');
+    const evil = await go(`${stack.appUrl}/auth/login?next=https://otro.sitio`);
+    assert.equal(evil.status, 302); // se ignora: vuelve a "/"
+  } finally { stack.close(); }
+});
