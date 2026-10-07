@@ -1,0 +1,23 @@
+{
+  "skill_name": "sac-roles-licencias",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "tengo 40 usuarios que solo ven los tableros de presupuesto en SAC y les asigné el rol Viewer. ¿qué licencia están consumiendo y cómo bajo el costo sin quitarles acceso?",
+      "expected_output": "Explica que el rol estándar Viewer consume Planning Standard; recomienda una copia de BI Content Viewer (licencia BI), que puede ver modelos de planificación; cuantifica el ahorro en CU (72,85 vs 25,60 por usuario/mes en el tramo de entrada) y da los pasos para reasignar por equipo.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Un usuario con una copia de Planner Reporter no puede ejecutar una multi action que corre un data action que copia datos de Gastos a EEFF; le sale error de permisos. ¿qué reviso?",
+      "expected_output": "Diagnóstico ordenado: licencia consumida, Multi Action Leer + Ejecutar, Data Action Ejecutar, Planning Model Mantener/Ejecutar, modelos y objetos compartidos (incluido el modelo destino EEFF), Data Access Control, bloqueos y versión.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "vamos a renovar SAC el próximo año dentro de Business Data Cloud: 15 planificadores que cargan datos, 2 personas que diseñan modelos y data actions y 60 que solo consultan. ¿qué licencias y cuántas capacity units necesito al mes?",
+      "expected_output": "Asigna 60 BI, 15 Planning Standard y 2 Planning Professional; calcula 60×25,60 + 15×72,85 + 2×820,43 = 4.269,61 CU/mes; menciona mínimos (10 Std + 1 Pro), la condición de SAP Enterprise Planning de la guía v9-2026, que BTPEA/CPEA ya no sirve para renovar y el Capacity Unit Estimator; no inventa precios en moneda.",
+      "files": []
+    }
+  ]
+}

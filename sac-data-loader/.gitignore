@@ -1,0 +1,6 @@
+node_modules/
+.env
+logs/
+dist/
+deploy/windows-usuario/exe/payload.zip
+deploy/windows-usuario/exe/*.syso

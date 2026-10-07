@@ -1,0 +1,81 @@
+{
+  "_ayuda": "Catálogo de cargas: una entrada por modelo de SAC. El archivo trae como encabezados los nombres reales de las dimensiones del modelo (columns = \"byName\"). Los periodos pueden venir en columnas (Ene 2026, 202601…) o en una columna Date con la medida en Importe. La versión se elige en pantalla. 'model' se busca primero por 'id' y, si no existe, por 'name'. 'defaultValues' se usa cuando la columna no viene en el archivo. 'importMethods': Update = reemplaza el valor de la celda; CleanAndReplace = borra primero lo que coincida con 'cleanAndReplaceScope'.",
+  "defaults": {
+    "numberLocale": "es",
+    "layout": "auto",
+    "columns": "byName",
+    "measure": "Importe",
+    "importMethods": [
+      "Update"
+    ],
+    "contextFields": {
+      "Versión": "Version"
+    },
+    "ignoreColumns": [
+      {
+        "name": "Total",
+        "note": "Los totales se calculan en SAC."
+      },
+      {
+        "name": "Observaciones"
+      },
+      {
+        "name": "Comentarios"
+      }
+    ],
+    "rules": {
+      "allowNegative": true,
+      "skipZeroValues": false,
+      "maxDecimals": 7
+    }
+  },
+  "templates": [
+    {
+      "id": "FN_INGRESOS",
+      "name": "Ingresos Fanalca",
+      "model": {
+        "id": "Couh7ojg5e54rh2d4udijq6o83k",
+        "name": "Modelo Ingresos FANALCA"
+      },
+      "defaultValues": {
+        "Clientes": "#",
+        "Referencias": "#"
+      },
+      "importMethods": [
+        "Update",
+        "CleanAndReplace"
+      ],
+      "cleanAndReplaceScope": [
+        "Version",
+        "Date",
+        "Sociedades",
+        "Auditoria"
+      ]
+    },
+    {
+      "id": "FN_GASTOS",
+      "name": "Gastos Fanalca",
+      "model": {
+        "id": "Cunejii8r2d7vr4ldq2ousgfg7f",
+        "name": "Modelo Gastos FANALCA"
+      }
+    },
+    {
+      "id": "FN_EEFF",
+      "name": "EEFF Fanalca",
+      "model": {
+        "id": "C2kgen7fqc13vleoibl06hk4j7o",
+        "name": "Modelo EEFF FANALCA"
+      }
+    },
+    {
+      "id": "OTRO",
+      "name": "Otro modelo (elegir de la lista)",
+      "description": "Cualquier modelo al que tenga acceso. Los encabezados del archivo deben llamarse igual que las dimensiones del modelo.",
+      "model": {
+        "selectable": true
+      },
+      "measure": null
+    }
+  ]
+}

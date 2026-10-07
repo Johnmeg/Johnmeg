@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Probador de data actions · {{name}}</title>
+  <link rel="icon" type="image/png" href="brand/img/favicon.png">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="brand/theme.css">
+  <script src="probador.js" defer></script>
+</head>
+<body class="brand-{{id}}">
+  <div class="utilbar">
+    <div class="wrap utilbar-inner">
+      <span class="util-label">{{utilLabel}}</span>
+      <div class="user" id="userBox" hidden>
+        <span class="avatar" id="userInitials" aria-hidden="true"></span>
+        <div class="user-text">
+          <span id="userName"></span>
+          <small id="userTenant"></small>
+        </div>
+        <button type="button" class="btn ghost small on-dark" id="logoutBtn">Cerrar sesión</button>
+      </div>
+    </div>
+  </div>
+
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="/" aria-label="{{name}} · Probador de data actions">
+        <img class="logo logo-color" src="brand/img/logo.png" alt="{{name}}" width="{{logoWidth}}" height="{{logoHeight}}">
+        <img class="logo logo-white" src="brand/img/logo-blanco.png" alt="{{name}}" width="{{logoWidth}}" height="{{logoHeight}}">
+      </a>
+      <span class="app-name">Probador de data actions</span>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="wrap">
+      <p class="kicker">{{kicker}}</p>
+      <h1 class="hero-title">Probador de data actions</h1>
+      <p class="hero-text">Elija el data action, la versión de pruebas y sus parámetros. La aplicación genera datos aleatorios, ejecuta el data action en SAC y compara el resultado con el valor esperado.</p>
+    </div>
+  </section>
+
+  <main>
+    <section id="loginView" class="card login" hidden>
+      <h2>Inicie sesión con su usuario de SAP Analytics Cloud</h2>
+      <p>Las pruebas se ejecutan con <b>sus propios permisos</b> de SAC: carga de datos en la versión de pruebas y ejecución de la multi action.</p>
+      <div class="alert error" id="loginError" hidden></div>
+      <a class="btn primary big" href="/auth/login">Iniciar sesión con SAP Analytics Cloud</a>
+    </section>
+
+    <div id="appView" hidden>
+      <ol class="stepper" aria-label="Pasos">
+        <li class="active"><span>1</span>Data action</li>
+        <li><span>2</span>Parámetros</li>
+        <li><span>3</span>Datos de prueba</li>
+        <li><span>4</span>Resultado</li>
+      </ol>
+
+      <!-- ---------------------------------------------- 1. data action -->
+      <section class="card" id="caseCard">
+        <h2>1. Data action a probar</h2>
+        <div class="grid">
+          <label class="field">
+            <span>Casos guardados</span>
+            <select id="catalogSel"></select>
+            <small class="hint" id="catalogDesc"></small>
+          </label>
+          <div class="field">
+            <span>Caso</span>
+            <div class="row-actions">
+              <button type="button" class="btn ghost small" id="newBtn">Nuevo</button>
+              <label class="btn ghost small file-btn">Abrir JSON<input type="file" id="openFile" accept=".json,application/json"></label>
+              <button type="button" class="btn ghost small" id="saveBtn">Descargar JSON</button>
+            </div>
+            <small class="hint">Los cambios se guardan en este navegador.</small>
+          </div>
+        </div>
+
+        <div class="grid form-grid">
+          <label class="field">
+            <span>Nombre de la prueba</span>
+            <input type="text" id="fNombre" autocomplete="off">
+          </label>
+          <label class="field">
+            <span>Modelo</span>
+            <select id="fModelo"></select>
+            <small class="hint" id="modelHint"></small>
+          </label>
+          <label class="field">
+            <span>Multi action (ID)</span>
+            <input type="text" id="fMultiAction" placeholder="&lt;paquete&gt;:&lt;ID&gt;" autocomplete="off" spellcheck="false">
+            <small class="hint">La multi action que contiene el data action, formato &lt;paquete&gt;:&lt;ID&gt;.</small>
+          </label>
+          <label class="field">
+            <span>Versión de pruebas</span>
+            <select id="fVersion"></select>
+            <small class="hint">Se borran sus datos en los periodos elegidos antes de cargar. Las versiones bloqueadas no se pueden usar.</small>
+          </label>
+          <div class="field">
+            <span>Periodos</span>
+            <div class="inline">
+              <input type="month" id="fDesde" aria-label="Desde">
+              <span class="to">a</span>
+              <input type="month" id="fHasta" aria-label="Hasta">
+            </div>
+            <small class="hint" id="periodHint"></small>
+          </div>
+          <label class="field">
+            <span>Tolerancia</span>
+            <input type="number" id="fTolerancia" min="0" step="any">
+            <small class="hint">Diferencia máxima permitida entre esperado y real.</small>
+          </label>
+        </div>
+      </section>
+
+      <!-- ---------------------------------------------- 2. parámetros -->
+      <section class="card" id="paramsCard">
+        <h2>2. Parámetros del data action</h2>
+        <p class="hint">Los parámetros que la multi action le pasa al data action (el ID debe ser el mismo de la multi action). Un parámetro de tipo <b>miembro</b> también se puede usar en los datos de prueba con <code>"$ID"</code>.</p>
+        <div id="paramsList" class="params"></div>
+        <div class="actions left">
+          <button type="button" class="btn ghost small" id="addParamBtn">+ Agregar parámetro</button>
+        </div>
+      </section>
+
+      <!-- ---------------------------------------------- 3. datos de prueba -->
+      <section class="card" id="dataCard">
+        <h2>3. Datos de prueba y resultado esperado</h2>
+        <p class="hint">Entradas aleatorias, resultados esperados y sus fórmulas. Los campos de los pasos 1 y 2 se reflejan aquí y viceversa.</p>
+        <label class="field editor-field">
+          <span>Definición completa del caso (JSON)</span>
+          <textarea id="caseJson" rows="20" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+          <small class="hint" id="jsonState"></small>
+        </label>
+        <details class="guide">
+          <summary>Guía rápida</summary>
+          <ul>
+            <li><b>entradas</b>: datos aleatorios entre <b>min</b> y <b>max</b>. <b>fijo</b> = miembros fijos; <b>variar</b> = lista de miembros, <code>{"aleatorio": 3, "filtro": {"PROPIEDAD": "Y"}}</code>, <code>"@ENTRADA"</code> o <code>"$PARAMETRO"</code>.</li>
+            <li><b>esperado</b>: celdas que el data action debe escribir y su <b>formula</b>: <code>v('PRECIO') * v('UNIDADES')</code>, <code>sum('GASTO') * v('KM') / sum('KM')</code>, <code>-v('GASTO')</code>, <code>round(x, 2)</code>, <code>c.Date</code>.</li>
+            <li><b>comun</b>: miembros fijos para todas las celdas (admite <code>"$PARAMETRO"</code>).</li>
+          </ul>
+        </details>
+
+        <div class="grid run-options">
+          <label class="field">
+            <span>Semilla</span>
+            <div class="inline">
+              <input type="number" id="seed" min="1" step="1">
+              <button type="button" class="btn ghost small" id="seedBtn">Nueva</button>
+            </div>
+            <small class="hint">Con la misma semilla se generan los mismos datos.</small>
+          </label>
+          <label class="field">
+            <span>Repeticiones</span>
+            <input type="number" id="reps" min="1" max="20" value="1">
+            <small class="hint">Cada repetición usa otra semilla (datos distintos).</small>
+          </label>
+          <div class="field">
+            <span>Opciones</span>
+            <label class="check"><input type="checkbox" id="stopOnFail" checked> Detener en el primer fallo</label>
+          </div>
+        </div>
+
+        <label class="confirm" id="confirmBox">
+          <input type="checkbox" id="confirmVersion">
+          <span id="confirmText"></span>
+        </label>
+
+        <div class="alert error" id="caseError" hidden></div>
+        <div class="actions">
+          <button type="button" class="btn ghost" id="previewBtn">Vista previa (sin escribir en SAC)</button>
+          <button type="button" class="btn primary" id="runBtn">Ejecutar prueba</button>
+        </div>
+      </section>
+
+      <section class="card" id="runCard" hidden>
+        <h2>4. Ejecución</h2>
+        <p class="hint" id="runInfo"></p>
+        <ol class="steps" id="stepsList"></ol>
+      </section>
+
+      <section class="card" id="resultCard" hidden>
+        <h2>Resultado</h2>
+        <div id="resultBanner" class="alert"></div>
+        <dl class="facts" id="facts"></dl>
+        <div class="table-wrap" id="repsWrap" hidden>
+          <table id="repsTable"><thead><tr><th>#</th><th>Semilla</th><th>Estado</th><th class="num">Celdas</th><th class="num">Con diferencia</th><th class="num">Tiempo</th></tr></thead><tbody></tbody></table>
+        </div>
+        <details class="guide" id="paramsSent" hidden>
+          <summary>Parámetros enviados a la multi action</summary>
+          <pre id="paramsSentPre" class="code"></pre>
+        </details>
+        <div id="maMessages"></div>
+        <div class="filters">
+          <label><input type="checkbox" id="onlyDiff"> Mostrar sólo celdas con diferencia</label>
+        </div>
+        <div id="groups"></div>
+        <details class="guide" id="inputsBox">
+          <summary>Datos de entrada generados</summary>
+          <div class="table-wrap"><table id="inputsTable"><thead></thead><tbody></tbody></table></div>
+        </details>
+        <div class="actions">
+          <a class="btn ghost" id="csvBtn" href="#" download hidden>Descargar resultado (CSV)</a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <span>{{footer}} · Probador de data actions</span>
+      <span>Los datos se cargan con su usuario de SAP Analytics Cloud</span>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+</body>
+</html>

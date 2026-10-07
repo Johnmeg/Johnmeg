@@ -1,0 +1,64 @@
+﻿{{TITULO}}
+Instalación en su computador
+======================================
+
+Qué hace
+--------
+{{QUE_HACE}}
+
+No necesita permisos de administrador. Se instala en:
+  %LOCALAPPDATA%\{{CARPETA}}
+
+
+Instalar (una sola vez)
+-----------------------
+1. Si recibió el archivo .exe: doble clic en él y siga desde el paso 3.
+   Si recibió el ZIP: extraiga TODO el ZIP en una carpeta (clic derecho >
+   Extraer todo...). No ejecute el instalador desde dentro del ZIP.
+2. Doble clic en  Instalar.cmd
+   - Si Windows muestra "Windows protegió su PC", pulse "Más información" >
+     "Ejecutar de todas formas". Si pregunta "¿Desea ejecutar este archivo?",
+     pulse "Ejecutar".
+3. Espere entre 1 y 5 minutos. El .exe ya trae todo lo necesario; con el
+   ZIP, el instalador descarga Node.js portátil (unos 30 MB) y las librerías.
+4. Si le pide datos de SAC (URL del tenant, Authorization URL, Token URL,
+   Client ID y Secret), pídalos al administrador de SAC. El Secret no se ve
+   al escribirlo; es normal.
+5. Al terminar se abre la aplicación en el navegador y queda el acceso directo
+   "{{ACCESO}}" en el escritorio y en el menú Inicio.
+
+
+Usar
+----
+- Doble clic en "{{ACCESO}}" (escritorio o menú Inicio).
+- Se abre el navegador en http://localhost:{{PUERTO}}
+- Pulse "Iniciar sesión con SAP Analytics Cloud" y entre con su usuario.
+- La aplicación queda funcionando en segundo plano. Para cerrarla:
+  menú Inicio > {{ACCESO}} > Detener {{ACCESO}}.
+  (Al apagar o reiniciar el computador también se cierra.)
+
+
+Actualizar a una versión nueva
+------------------------------
+Ejecute otra vez el .exe nuevo (o extraiga el ZIP nuevo y ejecute Instalar.cmd). Se conservan su
+configuración y sus registros.
+
+
+Desinstalar
+-----------
+Menú Inicio > {{ACCESO}} > Desinstalar {{ACCESO}}.
+
+
+Si algo falla
+-------------
+- "El puerto {{PUERTO}} está en uso": cierre cualquier ventana negra con
+  "npm start" o "npm run demo" y vuelva a ejecutar Instalar.cmd.
+- "No se pudo descargar Node.js" o "npm ci falló": su red usa proxy.
+  Abra una ventana cmd en esta carpeta y ejecute:
+     Instalar.cmd -Proxy http://<servidor-proxy>:<puerto>
+  (el valor del proxy se lo da TI).
+- Al iniciar sesión, SAC muestra un error de "redirect_uri": el cliente OAuth
+  de SAC debe tener la Redirect URI  http://localhost:{{PUERTO}}/auth/callback
+- Registros para soporte:
+     %LOCALAPPDATA%\{{CARPETA}}\instalacion.log   (instalación)
+     %LOCALAPPDATA%\{{CARPETA}}\app\logs\app.log (aplicación)
